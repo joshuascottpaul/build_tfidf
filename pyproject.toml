@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "build-tfidf"
+version = "0.1.0"
+description = "High-quality semantic search for Markdown corpora."
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+tfidf-search = "build_tfidf.cli:main"
+
+[tool.setuptools]
+packages = ["build_tfidf"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+  "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]

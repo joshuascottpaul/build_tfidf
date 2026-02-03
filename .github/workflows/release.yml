@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Build source tarball
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m build --sdist
+      - name: Compute sha256
+        id: sha
+        run: |
+          SHA=$(shasum -a 256 dist/*.tar.gz | awk '{print $1}')
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "tarball=$(ls dist/*.tar.gz | head -n1)" >> $GITHUB_OUTPUT
+      - name: Update tap formula
+        env:
+          TAP_REPO: joshuascottpaul/homebrew-build_tfidf
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git tap
+          TAR_URL=https://github.com/joshuascottpaul/build_tfidf/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz
+          FORMULA=tap/Formula/build-tfidf.rb
+          sed -i.bak "s|^  url .*|  url \"${TAR_URL}\"|" "$FORMULA"
+          sed -i.bak "s|^  sha256 .*|  sha256 \"${{ steps.sha.outputs.sha }}\"|" "$FORMULA"
+          rm -f "$FORMULA.bak"
+          cd tap
+          git add Formula/build-tfidf.rb
+          git commit -m "Update build-tfidf ${GITHUB_REF_NAME}"
+          git push

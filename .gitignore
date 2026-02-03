@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+build_tfidf/data/*
+!build_tfidf/data/.gitkeep
+*.faiss
+*.npz
+*.npy
+*.pkl
+.DS_Store
+build_tfidf.egg-info/

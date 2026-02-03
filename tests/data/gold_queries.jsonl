@@ -1,0 +1,2 @@
+{"id":"q001","query":"alpha","expected_paths":["corpus/alpha.md"],"notes":"basic term match"}
+{"id":"q002","query":"beta","expected_paths":["corpus/beta.md"],"notes":"basic term match"}
