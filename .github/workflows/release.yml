@@ -29,6 +29,8 @@ jobs:
           TAP_REPO: joshuascottpaul/homebrew-build_tfidf
           GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
+          git config --global user.email "ci@github.com"
+          git config --global user.name "build_tfidf-ci"
           git clone https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git tap
           TAR_URL=https://github.com/joshuascottpaul/build_tfidf/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz
           FORMULA=tap/Formula/build-tfidf.rb
