@@ -41,3 +41,18 @@ How we will address this in the future
 ## Notes
 - OpenAI embeddings require `OPENAI_API_KEY` in the environment.
 - For offline mode, set `EMBEDDING_PROVIDER=ollama`.
+
+## Homebrew Install Strategy
+Current approach
+- Homebrew installs binary wheels at install time using `pip --only-binary :all:` and `requirements.txt`.
+- Reason: sdists trigger build isolation and heavy native builds that fail or take hours on macOS.
+- Impact: install requires network access at brew time but keeps FAISS and quality intact.
+
+Known issues addressed
+- `faiss-cpu` does not publish sdists, so vendoring fails in Homebrew.
+- `openai` 2.x pulls `jiter` which requires Rust builds from sdist.
+
+Future plan
+1. Transition to fully vendored wheel resources for all dependencies.
+2. Remove network requirement during brew install.
+3. Validate by running `brew reinstall build-tfidf` and `tfidf-search --help`.
