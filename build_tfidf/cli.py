@@ -25,7 +25,8 @@ def _check_runtime() -> None:
         import rank_bm25  # noqa: F401
     except Exception as exc:
         raise SystemExit(
-            "Missing required dependencies. Run: pip install -r requirements.txt"
+            "Missing required dependencies. Activate your venv and run: "
+            "pip install -r requirements.txt && pip install -e ."
         ) from exc
 
 
@@ -39,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     u = sub.add_parser("update", help="incrementally update the index")
     u.add_argument("--root", default=".", help="root directory to scan")
+    u.add_argument("--remove-code", action="store_true", help="strip code fences")
 
     q = sub.add_parser("query", help="query the index")
     q.add_argument("text", help="query text")
@@ -74,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{idx:02d}. {chunk['path']}  (score={score:.4f})")
         return 0
     if args.cmd == "update":
-        update_index(Path(args.root), cfg)
+        update_index(Path(args.root), cfg, remove_code=args.remove_code)
         return 0
     if args.cmd == "inspect":
         from .index import MANIFEST_PATH, _load_json

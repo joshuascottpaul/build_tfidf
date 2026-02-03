@@ -80,7 +80,12 @@ def embed_ollama(texts: Iterable[str], config: EmbeddingConfig) -> list[list[flo
 def embed_texts(texts: Iterable[str], config: EmbeddingConfig) -> list[list[float]]:
     provider = config.provider.lower()
     if provider == "openai":
-        return embed_openai(texts, config)
+        try:
+            return embed_openai(texts, config)
+        except Exception:
+            if config.fallback_to_ollama:
+                return embed_ollama(texts, config)
+            raise
     if provider == "ollama":
         return embed_ollama(texts, config)
     raise ValueError(f"Unknown embedding provider: {config.provider}")

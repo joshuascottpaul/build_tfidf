@@ -93,7 +93,7 @@ def build(
         embedding_dimensions=len(vectors[0]),
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
-        cleaning_rules=CLEANING_RULES,
+        cleaning_rules=f"{CLEANING_RULES}|remove_code={remove_code}",
         vector_backend="faiss",
         weight_semantic=weight_semantic,
         weight_lexical=weight_lexical,
@@ -202,6 +202,12 @@ def update(
     remove_code: bool = False,
 ) -> None:
     _ensure_data_dir()
+    if META_PATH.exists():
+        meta = _load_json(META_PATH)
+        validate_signature(meta)
+        expected_rules = f"{CLEANING_RULES}|remove_code={remove_code}"
+        if str(meta.get("cleaning_rules")) != expected_rules:
+            raise SystemExit("Index config mismatch. Rebuild required.")
     current_paths = iter_markdown_files(root, DEFAULT_EXCLUDE_DIRS)
     manifest = load_manifest(MANIFEST_PATH)
     entries = {e["path"]: e for e in manifest.get("entries", [])}

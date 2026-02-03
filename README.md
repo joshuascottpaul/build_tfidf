@@ -7,6 +7,7 @@ High-quality semantic search for Markdown corpora.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 
 # Build index
 tfidf-search build
@@ -20,6 +21,7 @@ tfidf-search query "your query"
 - `tfidf-search update`
 - `tfidf-search query "..."`
 - `tfidf-search inspect <chunk_id>`
+Tip - use `--remove-code` on build and update if you want code fences stripped.
 
 ## Dependency Pins and Rationale
 We pin versions for reliability and Homebrew compatibility.
@@ -41,6 +43,8 @@ How we will address this in the future
 ## Notes
 - OpenAI embeddings require `OPENAI_API_KEY` in the environment.
 - For offline mode, set `EMBEDDING_PROVIDER=ollama`.
+- For fallback, set `FALLBACK_TO_OLLAMA=true` to fail over from OpenAI on errors.
+- If `tfidf-search` is not found, confirm your venv is active and run `pip install -e .`.
 
 ## Homebrew Install Strategy
 Current approach
