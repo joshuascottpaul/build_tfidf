@@ -21,9 +21,10 @@ jobs:
       - name: Compute sha256
         id: sha
         run: |
-          SHA=$(shasum -a 256 dist/*.tar.gz | awk '{print $1}')
+          TAR_URL=https://github.com/joshuascottpaul/build_tfidf/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz
+          curl -L -o tag.tar.gz "$TAR_URL"
+          SHA=$(shasum -a 256 tag.tar.gz | awk '{print $1}')
           echo "sha=$SHA" >> $GITHUB_OUTPUT
-          echo "tarball=$(ls dist/*.tar.gz | head -n1)" >> $GITHUB_OUTPUT
       - name: Update tap formula
         env:
           TAP_REPO: joshuascottpaul/homebrew-build_tfidf
