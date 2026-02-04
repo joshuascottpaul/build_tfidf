@@ -40,6 +40,10 @@ How we will address this in the future
 2. If `openai` 2.x offers sdist that does not require Rust or ships wheels for all brew paths, we will upgrade.
 3. We will validate upgrades by running `brew reinstall build-tfidf` and `tfidf-search --help`.
 
+Homebrew note
+- We pin and list transitive runtime dependencies explicitly because Homebrew uses `pip --no-deps`.
+- This makes installs deterministic and avoids missing modules at runtime.
+
 ## Notes
 - OpenAI embeddings require `OPENAI_API_KEY` in the environment.
 - For offline mode, set `EMBEDDING_PROVIDER=ollama`.
