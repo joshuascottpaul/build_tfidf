@@ -4,7 +4,7 @@ High-quality semantic search for Markdown corpora.
 
 ## Quickstart
 ```bash
-python3 -m venv .venv
+python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
@@ -49,6 +49,7 @@ Homebrew note
 - For offline mode, set `EMBEDDING_PROVIDER=ollama`.
 - For fallback, set `FALLBACK_TO_OLLAMA=true` to fail over from OpenAI on errors.
 - If `tfidf-search` is not found, confirm your venv is active and run `pip install -e .`.
+ - For tests, install dev deps with `pip install -r requirements-dev.txt`.
 
 ## Homebrew Install Strategy
 Current approach
