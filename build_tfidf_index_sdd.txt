@@ -1,0 +1,312 @@
+System Design Document (SDD)
+Semantic Search for Markdown Corpus
+
+1) Overview
+Build a high‑quality semantic search system over ~1,200 Markdown files (average ~10k chars). The system should provide meaning‑based retrieval, support exact‑match bias when needed, and scale for frequent updates. It will run locally, with embeddings from either OpenAI (preferred for quality) or a local Ollama model. Results are returned as ranked file paths and excerpts, with optional re‑ranking for maximum precision. Release and packaging will target GitHub and Homebrew for simple installation and updates.
+
+2) Goals
+- Best‑in‑class semantic relevance for natural‑language queries.
+- Strong recall for proper nouns and exact terms.
+- Fast incremental updates when files change.
+- Local, scriptable CLI workflow similar to the existing TF‑IDF tool.
+- Measurable retrieval quality with repeatable evaluation.
+
+3) Non‑Goals
+- No web UI (CLI only).
+- No multi‑tenant access control.
+- No long‑term analytics dashboard.
+
+4) Requirements
+Deployment
+- Target machine: MacBook Pro (Apple M2 Pro, 16 GB RAM).
+Release & Distribution
+- Project repo: `joshuascottpaul/build_tfidf` (new).
+- Homebrew tap: new tap repo under `joshuascottpaul` (to be created).
+- CLI command name: `tfidf-search`.
+- The install must create a Python venv and install `requirements.txt`.
+- Files should live under a `build_tfidf/` folder at repo root.
+- GitHub Actions must publish updates to the Homebrew tap and CLI formula.
+- CI must run tests with `pytest`.
+Functional
+- Index all Markdown files under the working directory.
+- Clean and chunk content into semantic units.
+- Generate embeddings (OpenAI or Ollama) and persist locally.
+- Vector search by cosine similarity.
+- Hybrid ranking (semantic + lexical) for better recall.
+- Optional LLM re‑ranking of top candidates for precision.
+- Incremental rebuild based on file mtime and content hash.
+
+Non‑functional
+- Deterministic rebuilds with stable chunk IDs.
+- Storage on disk; no external DB required.
+- Reasonable query latency (< 1s for vector search; < 3s with re‑rank on top‑N).
+
+5) Architecture
+Components
+- Ingestor: discovers markdown, reads content, strips noise.
+- Chunker: splits into overlapping token windows, preserves headings.
+- Embedder: OpenAI embeddings (primary) or Ollama (fallback).
+- Vector Index: FAISS or SQLite+HNSW for similarity search.
+- Lexical Index: BM25 over chunks for keyword bias.
+- Reranker: optional LLM to re‑score top candidates.
+- CLI: build, update, query, inspect.
+
+Data Flow
+1. Discover markdown files -> read -> clean.
+2. Chunk into segments with overlap.
+3. Compute embeddings for each chunk.
+4. Persist vectors + metadata.
+5. Build lexical index over chunk text.
+6. Query -> embedding -> vector search -> lexical search -> merge -> optional rerank -> print results.
+
+6) Data Model
+Chunk Record
+- chunk_id: stable hash of file path + chunk index + content hash
+- path: file path
+- heading: nearest heading context
+- chunk_index: ordinal within file
+- text: chunk text (optional to store; can be loaded on demand)
+- embedding: vector (float list)
+- mtime: file modification time
+- sha256: content hash (for change detection)
+
+7) Chunking Strategy
+- Token window: 400–800 tokens, overlap 80–120 tokens.
+- Heading preservation: prepend nearest heading path to chunk text.
+- Strip boilerplate: front‑matter, code fences (optional), repeated footers.
+- Rationale: smaller, coherent chunks improve retrieval precision.
+
+8) Embeddings
+Primary (quality‑first): OpenAI `text-embedding-3-large`.
+- 3072‑dimension default vector size.
+- Optional `dimensions` parameter can shorten vectors (quality vs storage trade‑off).
+Fallback (local): Ollama embedding model (e.g., `nomic-embed-text`).
+
+9) Vector Index
+Option A: FAISS (default; fastest)
+- Pros: high performance, mature tooling.
+- Cons: additional dependency; platform‑specific wheels.
+- Rationale: best retrieval speed/quality at this corpus size and supports strong LLM reasoning workflows.
+
+Option B: SQLite + HNSW (portable)
+- Pros: simple deployment, single file, good performance.
+- Cons: slower than FAISS at large scale.
+- Rationale: fallback when portability and minimal dependencies matter more than speed.
+
+10) Lexical Index
+- BM25 over chunk text.
+- Merge strategy: normalized score fusion, e.g., 0.7 semantic + 0.3 lexical.
+- Ensures proper nouns and exact term matches surface.
+
+11) Re‑ranking
+- Rerank top‑N (e.g., 30–60) with a small LLM prompt.
+- Input: query + chunk text + heading context.
+- Output: final score and brief rationale (optional).
+- Improves precision for ambiguous queries.
+
+12) Scoring & Evaluation
+Hybrid Scoring
+- Normalize semantic and lexical scores to [0, 1] by min‑max on candidate set.
+- Final score = (0.7 * semantic) + (0.3 * lexical); weights configurable.
+- Rationale: min‑max keeps scores comparable without assuming distributions; a 0.7/0.3 bias favors semantics while preserving exact‑match recall.
+Evaluation
+- Maintain a curated gold query set with expected file paths.
+- Target: top‑5 contains expected file for 80% of gold queries; after baseline, raise to 85–90%.
+- Add a regression test to fail if quality drops below target.
+
+13) Incremental Updates
+- Track file `mtime` and `sha256`.
+- Re‑embed only changed chunks; delete removed files.
+- Keep a manifest: file path -> list of chunk_ids.
+- If index config differs from current flags, update must fail and require rebuild.
+
+14) CLI
+- build: full rebuild of chunk, vector, and lexical indexes.
+- update: incremental update by mtime/hash.
+- query "...": returns ranked chunks and file paths.
+- inspect <chunk_id>: show chunk text and metadata.
+
+15) Repo Layout
+- `build_tfidf/`: package source and CLI entry point.
+- `tests/`: pytest test suite.
+- `requirements.txt`: runtime dependencies for venv install.
+- `.github/workflows/`: CI + Homebrew tap update workflows.
+
+16) Configuration
+- `EMBEDDING_PROVIDER`: openai | ollama
+- `OPENAI_MODEL`: text-embedding-3-large
+- `DIMENSIONS`: optional integer to shorten vectors
+- `CHUNK_SIZE`, `CHUNK_OVERLAP`
+- `TOP_K`, `RERANK_TOP_N`, `WEIGHT_SEMANTIC`, `WEIGHT_LEXICAL`
+- `EXCLUDE_DIRS`: list (e.g., .git, .venv, node_modules)
+
+17) Index Versioning
+- Index metadata must include schema version, embedding model, and chunking parameters.
+- On change, the index is invalid and must be rebuilt; old indexes are incompatible.
+- Add `index_signature = sha256(schema_version + embedding_model + dimensions + chunk_size + chunk_overlap + cleaning_rules + vector_backend + weights)` and compare on load.
+- Rationale: forces reproducibility and prevents silent drift when configuration changes.
+- Cleaning rules must encode `remove_code` to avoid mismatched text normalization.
+
+18) Security & Privacy
+- Treat embedding indexes as sensitive (content is recoverable).
+- Pickle use is avoided; store vectors in FAISS or SQLite instead.
+- If using OpenAI, consider storing API key in environment variables.
+
+19) Observability
+- Log build stats: files scanned, chunks created, tokens processed.
+- Log query latency and top scores.
+- Optional JSONL logs for debugging retrieval quality.
+
+20) Cost & Performance
+- Embedding costs scale with token count.
+- Batch embedding requests to reduce overhead.
+- Reuse embeddings for unchanged files.
+
+Dependency Policy
+- Pin exact versions in `requirements.txt`.
+- Upgrade only for measurable quality/perf gains or security fixes.
+- On upgrade: rebuild index, rerun gold‑set tests, and bump index version.
+
+21) Operational Safeguards
+- Enforce max file size and max tokens per chunk.
+- Rate‑limit embedding calls to avoid provider timeouts.
+- Detect and skip binary or malformed files gracefully.
+- Defaults: max file size 2 MB (warn + skip), chunk soft max 800 tokens, hard cap 1000 (truncate), batch size 32, 60 requests/min.
+- Skip files with >25% replacement chars after UTF‑8 decode.
+- Rationale: protects latency, cost, and stability without sacrificing quality on normal‑sized notes.
+
+22) Offline Mode
+- Config flags: `EMBEDDING_PROVIDER`, `FALLBACK_TO_OLLAMA`, `OLLAMA_MODEL`.
+- If OpenAI is unavailable, warn and fall back to Ollama only when `FALLBACK_TO_OLLAMA=true`.
+- If fallback is disabled, fail fast with a clear error.
+- Record actual provider/model used in index metadata to prevent mixed‑model drift.
+- Rationale: preserves quality expectations while keeping a reliable offline escape hatch.
+- Implementation note: OpenAI failures trigger fallback only when `FALLBACK_TO_OLLAMA=true`.
+
+23) Packaging
+- Homebrew formula creates a venv, installs `requirements.txt`, and exposes `tfidf-search`.
+- Release workflow updates tap formula on version/tag.
+- Homebrew `test do` runs `tfidf-search --help` and a tiny smoke query against a temp fixture.
+- Release uses a tagged source tarball artifact; formula points to that immutable URL and SHA256.
+- Tap update fails on SHA mismatch; no force‑pushes.
+- Provide a dry‑run mode in the release workflow for verification before pushing.
+- Rationale: ensures installs are provably correct, reproducible, and safe to publish.
+- Homebrew status and issues
+  - Phase 1 now uses binary‑only install at brew time with `pip --only-binary :all:` and no vendored resources.
+  - Reasoning: FAISS and numpy build failures on macOS and lack of sdists make PEP 517 builds fragile in Homebrew.
+  - Issue: if any dependency lacks a macOS wheel for Python 3.10, the install fails with "no matching distribution".
+  - Mitigation: pin versions with known wheels and keep Python at 3.10 in the formula until wheel coverage changes.
+- Phase 2 plan for Homebrew
+  - Vendor exact wheel artifacts in the tap and install from local paths only.
+  - Reasoning: removes PyPI availability risk and makes installs deterministic and offline‑friendly.
+  - Steps: `pip download --only-binary :all:` in release workflow, commit wheels to tap, update formula to install local wheels, add tap CI to validate wheel hashes.
+ - Runtime help policy
+   - CLI error for missing deps must instruct venv activation and editable install.
+   - Reasoning: avoids support loops when `tfidf-search` is missing after requirements install.
+
+24) Risks & Mitigations
+- Risk: embedding drift if model changes -> Mitigation: pin model name and rebuild on upgrade.
+- Risk: large files dilute relevance -> Mitigation: chunking + overlap.
+- Risk: exact term miss -> Mitigation: hybrid BM25 + semantic.
+
+25) Future Enhancements
+- Per‑folder indexes and filters.
+- Query expansion with domain synonym map.
+- Learned re‑ranker to replace LLM rerank.
+- UI or TUI for interactive browsing.
+
+26) Decisions Locked
+1. Gold query set defined (size, format, expected paths).
+2. Hybrid score normalization and weight defaults confirmed.
+3. Index backend chosen: FAISS (SQLite+HNSW fallback).
+4. Dependency version pinning and upgrade policy documented.
+5. Index metadata schema and versioning rules specified.
+6. Homebrew packaging steps and release workflow finalized.
+7. Operational limits (file size, token caps, rate limits) set.
+8. Offline fallback behavior and config flags defined.
+
+27) Implementation Checklist (File‑By‑File) — Legendary Spec
+Workflow Hooks
+1. Before implementation, run `/plan` to lock execution steps and confirm scope.
+2. Use `/agent` for parallelizable scaffolding tasks (repo bootstrap, CI skeleton).
+3. After each milestone, run `/review` to validate changes and catch regressions.
+
+1. Repo bootstrap
+- `build_tfidf/` (package root): create the package directory at repo root.
+- `build_tfidf/__init__.py`: expose `__version__`.
+- `README.md`: purpose, quickstart, examples, troubleshooting.
+- `CHANGELOG.md`: release notes per tag.
+- `.gitignore`: ignore `build_tfidf/data/`, `.venv/`, `*.faiss`, `*.npz`, caches.
+- Acceptance: `pip install -e .` works, `tfidf-search --help` prints usage.
+
+2. Packaging
+- `requirements.txt`: pinned runtime dependencies.
+- `pyproject.toml` (preferred): define console script `tfidf-search = build_tfidf.cli:main`.
+- `README.md`: install + usage references updated.
+- Acceptance: package metadata valid; editable install works.
+
+3. Ingest + cleaning
+- `build_tfidf/ingest.py`: file discovery, exclude dirs, UTF‑8 validation.
+- `build_tfidf/cleaning.py`: strip front‑matter, optional code fences, boilerplate.
+- Acceptance: discovery skips excluded dirs and malformed/binary files without crash.
+
+4. Chunking
+- `build_tfidf/chunking.py`: heading‑aware chunking with overlap and token limits.
+- Include `Chunk` dataclass with `path`, `heading`, `chunk_index`, `text`, `sha256`.
+- Acceptance: max tokens enforced; heading path prepended; stable chunk IDs.
+
+5. Embeddings
+- `build_tfidf/embeddings.py`: OpenAI client (batched), Ollama fallback.
+- Record provider/model used in metadata.
+- Respect rate limits and batch size.
+- Acceptance: provider switch works; fallback is gated by `FALLBACK_TO_OLLAMA`.
+
+6. Index backends
+- `build_tfidf/vector_store.py`: FAISS build/search/save/load.
+- `build_tfidf/lexical.py`: BM25 build/search.
+- `build_tfidf/scoring.py`: hybrid normalization + fusion.
+- Acceptance: vector search returns top‑K in <1s for typical queries.
+
+7. Metadata + versioning
+- `build_tfidf/metadata.py`: schema, `index_signature`, validation.
+- Store schema + signature alongside index files.
+- Acceptance: mismatched signature refuses to load and instructs rebuild.
+
+8. Index orchestration
+- `build_tfidf/index.py`: build/update/query pipeline and persistence.
+- `build_tfidf/manifest.py`: file->chunk map for incremental updates.
+- Acceptance: update touches only changed files and deletes removed ones.
+
+9. Re‑ranking
+- `build_tfidf/rerank.py`: optional LLM rerank for top‑N.
+- Acceptance: when enabled, rerank changes ordering; when disabled, no network calls.
+
+10. CLI and entry point
+- `build_tfidf/cli.py`: argparse/typer commands `build`, `update`, `query`, `inspect`.
+- `build_tfidf/config.py`: load config from env + defaults; validate types.
+- Acceptance: `tfidf-search build` runs end‑to‑end on a tiny fixture.
+
+11. Tests
+- `tests/data/gold_queries.jsonl`: curated queries + expected paths.
+- `tests/test_retrieval_quality.py`: enforce top‑5 target.
+- `tests/test_cli_smoke.py`: build/query against fixture corpus.
+- `tests/test_versioning.py`: index signature mismatch error.
+- Acceptance: `pytest` passes locally and in CI.
+
+12. CI
+- `.github/workflows/ci.yml`: runs pytest on push/PR; caches pip.
+- Acceptance: CI green on main branch.
+
+13. Homebrew packaging
+- Tap repo: `joshuascottpaul/homebrew-build_tfidf`.
+- `Formula/build-tfidf.rb`: venv install, `requirements.txt`, `test do`.
+- Main repo workflow: `.github/workflows/release.yml` builds tarball, computes SHA, updates tap.
+- Acceptance: `brew install build-tfidf` produces `tfidf-search` and test passes.
+
+14. Index artifacts (local)
+- `build_tfidf/data/` (gitignored): FAISS index + metadata + manifest.
+- Acceptance: clean build produces consistent artifacts; rebuild invalidates old signature.
+
+28) Implementation Status
+- Done: Repo bootstrap, Packaging, Ingest and cleaning, Chunking, Embeddings, Index backends, Metadata and versioning, Index orchestration, Re ranking, CLI and entry point, Tests, CI, Homebrew packaging, Index artifacts, Update command, Inspect command, Incremental update path.
+- Pending: None.
