@@ -51,6 +51,8 @@ Current approach
 - Homebrew installs binary wheels at install time using `pip --only-binary :all:` and `requirements.txt`.
 - Reason: sdists trigger build isolation and heavy native builds that fail or take hours on macOS.
 - Impact: install requires network access at brew time but keeps FAISS and quality intact.
+- Relocation note: Homebrew relocation fails for the `tiktoken` wheel. The formula skips relocation to avoid install errors.
+- Risk: binaries remain linked to their install path. If the Cellar moves, reinstall is required.
 
 Known issues addressed
 - `faiss-cpu` does not publish sdists, so vendoring fails in Homebrew.
