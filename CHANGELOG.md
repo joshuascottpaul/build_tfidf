@@ -21,3 +21,7 @@
 ## 0.1.9
 - Show help on no args.
 - Fix shorthand query parsing.
+
+## 0.1.10
+- Preserve flags in shorthand queries like `--open` and `--pbcopy`.
+- Expand CLI help examples and query options.
