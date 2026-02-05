@@ -41,11 +41,14 @@ tfidf-search build --remove-code
 ## Query the Index
 ```bash
 tfidf-search query "your query"
+tfidf-search "your query"            # shorthand
+tfidf-search --query "your query"    # shorthand
 tfidf-search query "your query" --top 10
 tfidf-search query "your query" --open 1
 tfidf-search query "your query" --reveal 1
 tfidf-search query "your query" --pbcopy 1
 tfidf-search query "your query" --paths-only
+tfidf-search query "your query" --all-chunks
 ```
 
 ## Update the Index

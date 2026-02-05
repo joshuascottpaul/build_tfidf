@@ -21,6 +21,25 @@ def test_cli_query_shorthand(monkeypatch):
     assert rc == 0
 
 
+def test_cli_query_shorthand_with_open(monkeypatch):
+    def _noop_query(*args, **kwargs):
+        return [({"path": "/tmp/a.md"}, 0.5)]
+
+    import subprocess
+
+    calls = []
+
+    def _fake_run(args, **kwargs):
+        calls.append(args)
+        return None
+
+    monkeypatch.setattr(cli, "query_index", _noop_query)
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    rc = cli.main(["uncertainty", "--open", "1"])
+    assert rc == 0
+    assert calls and calls[0][0] == "open"
+
+
 def test_cli_no_args_shows_help(monkeypatch, capsys):
     rc = cli.main([])
     assert rc == 0

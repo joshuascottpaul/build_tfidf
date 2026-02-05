@@ -38,11 +38,16 @@ def build_parser() -> argparse.ArgumentParser:
             "  tfidf-search build --root /path/to/corpus\n"
             "  tfidf-search query \"your query\"\n"
             "  tfidf-search \"your query\"  # shorthand\n"
+            "  tfidf-search \"your query\" --open 1  # shorthand\n"
             "  tfidf-search --query \"your query\"  # shorthand\n"
             "  tfidf-search query \"your query\" --open 1\n"
             "  tfidf-search query \"your query\" --pbcopy 1\n"
             "  tfidf-search query \"your query\" --paths-only\n"
             "  tfidf-search update --remove-code\n"
+            "\n"
+            "Query options:\n"
+            "  --top N --rerank-model MODEL --rerank-top N --all-chunks\n"
+            "  --open N --reveal N --pbcopy N --paths-only\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -80,11 +85,20 @@ def _inject_shorthand_query(argv: list[str] | None) -> list[str]:
         idx = argv.index("--query")
         if idx + 1 >= len(argv):
             return ["query"]
-        return ["query", argv[idx + 1]]
+        value = argv[idx + 1]
+        rest: list[str] = []
+        skip = {idx, idx + 1}
+        for i, token in enumerate(argv):
+            if i in skip:
+                continue
+            rest.append(token)
+        return ["query", value, *rest]
     if argv[0].startswith("-"):
         return argv
     if argv[0] in {"build", "update", "query", "inspect"}:
         return argv
+    if any(token.startswith("-") for token in argv[1:]):
+        return ["query", *argv]
     return ["query", " ".join(argv)]
 
 

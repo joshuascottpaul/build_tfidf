@@ -14,16 +14,22 @@ tfidf-search build
 
 # Query
 tfidf-search query "your query"
+tfidf-search "your query"            # shorthand
+tfidf-search --query "your query"    # shorthand
 ```
 
 ## CLI
-- `tfidf-search build`
-- `tfidf-search update`
-- `tfidf-search query "..."`
+- `tfidf-search build --root /path/to/corpus`
+- `tfidf-search update --remove-code`
+- `tfidf-search query "your query"`
+- `tfidf-search "your query"` (shorthand)
+- `tfidf-search --query "your query"` (shorthand)
 - `tfidf-search inspect <chunk_id>`
-Tip - use `--remove-code` on build and update if you want code fences stripped.
-Tip - use `--open N` or `--reveal N` to open or show a result in Finder.
-Tip - use `--pbcopy N` to copy a result path and `--paths-only` for scripts.
+Tips
+- Use `--remove-code` on build and update if you want code fences stripped.
+- Use `--open N` or `--reveal N` to open or show a result in Finder.
+- Use `--pbcopy N` to copy a result path and `--paths-only` for scripts.
+- Use `--all-chunks` to show multiple chunks per file.
 
 ## Dependency Pins and Rationale
 We pin versions for reliability and Homebrew compatibility.
@@ -51,7 +57,7 @@ Homebrew note
 - For offline mode, set `EMBEDDING_PROVIDER=ollama`.
 - For fallback, set `FALLBACK_TO_OLLAMA=true` to fail over from OpenAI on errors.
 - If `tfidf-search` is not found, confirm your venv is active and run `pip install -e .`.
- - For tests, install dev deps with `pip install -r requirements-dev.txt`.
+- For tests, install dev deps with `pip install -r requirements-dev.txt`.
 
 ## Homebrew Install Strategy
 Current approach
