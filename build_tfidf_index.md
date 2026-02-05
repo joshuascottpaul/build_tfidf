@@ -42,6 +42,10 @@ tfidf-search build --remove-code
 ```bash
 tfidf-search query "your query"
 tfidf-search query "your query" --top 10
+tfidf-search query "your query" --open 1
+tfidf-search query "your query" --reveal 1
+tfidf-search query "your query" --pbcopy 1
+tfidf-search query "your query" --paths-only
 ```
 
 ## Update the Index

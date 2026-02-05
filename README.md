@@ -22,6 +22,8 @@ tfidf-search query "your query"
 - `tfidf-search query "..."`
 - `tfidf-search inspect <chunk_id>`
 Tip - use `--remove-code` on build and update if you want code fences stripped.
+Tip - use `--open N` or `--reveal N` to open or show a result in Finder.
+Tip - use `--pbcopy N` to copy a result path and `--paths-only` for scripts.
 
 ## Dependency Pins and Rationale
 We pin versions for reliability and Homebrew compatibility.

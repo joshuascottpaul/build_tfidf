@@ -154,6 +154,7 @@ def query(
     weight_lexical: float = 0.3,
     rerank_model: str | None = None,
     rerank_top_n: int = 30,
+    dedupe_by_path: bool = True,
 ) -> list[tuple[dict, float]]:
     meta = _load_json(META_PATH)
     validate_signature(meta)
@@ -189,7 +190,20 @@ def query(
                     break
         results = reranked_set
 
-    return results[:top_k]
+    if not dedupe_by_path:
+        return results[:top_k]
+
+    seen = set()
+    deduped = []
+    for chunk, score in results:
+        path = chunk.get("path")
+        if path in seen:
+            continue
+        seen.add(path)
+        deduped.append((chunk, score))
+        if len(deduped) >= top_k:
+            break
+    return deduped
 
 
 def update(
