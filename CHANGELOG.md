@@ -10,3 +10,7 @@
 ## 0.1.6
 - Add explicit transitive runtime pins for Homebrew installs.
 - Document relocation skip for tiktoken.
+
+## 0.1.7
+- Add query helpers for open, reveal, and clipboard.
+- Add paths-only output and default file dedupe.
