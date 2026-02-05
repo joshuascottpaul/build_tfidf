@@ -17,3 +17,7 @@
 
 ## 0.1.8
 - Add exceptiongroup to runtime deps for Homebrew on Python 3.10.
+
+## 0.1.9
+- Show help on no args.
+- Fix shorthand query parsing.
