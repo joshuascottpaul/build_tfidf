@@ -14,3 +14,6 @@
 ## 0.1.7
 - Add query helpers for open, reveal, and clipboard.
 - Add paths-only output and default file dedupe.
+
+## 0.1.8
+- Add exceptiongroup to runtime deps for Homebrew on Python 3.10.
