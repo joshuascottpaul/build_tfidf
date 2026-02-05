@@ -91,7 +91,13 @@ def _inject_shorthand_query(argv: list[str] | None) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     _check_runtime()
     parser = build_parser()
-    args = parser.parse_args(_inject_shorthand_query(argv))
+    if argv is None:
+        argv = sys.argv[1:]
+    argv = _inject_shorthand_query(argv)
+    if not argv:
+        parser.print_help()
+        return 0
+    args = parser.parse_args(argv)
     cfg = load_config_from_env()
 
     if args.cmd == "build":

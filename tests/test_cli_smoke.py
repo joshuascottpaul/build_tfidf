@@ -21,6 +21,13 @@ def test_cli_query_shorthand(monkeypatch):
     assert rc == 0
 
 
+def test_cli_no_args_shows_help(monkeypatch, capsys):
+    rc = cli.main([])
+    assert rc == 0
+    out = capsys.readouterr()
+    assert "usage:" in out.out
+
+
 def test_cli_query_all_chunks(monkeypatch):
     def _noop_query(*args, **kwargs):
         assert kwargs.get("dedupe_by_path") is False
