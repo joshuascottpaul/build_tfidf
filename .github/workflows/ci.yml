@@ -16,6 +16,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
           python -m pip install -e .
       - name: Run tests
         run: pytest -q
+
+  brew:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tap and install
+        run: |
+          brew update
+          brew tap joshuascottpaul/build-tfidf
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install -v build-tfidf
+          tfidf-search --help
