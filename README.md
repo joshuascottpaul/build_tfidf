@@ -2,6 +2,37 @@
 
 High-quality semantic search for Markdown corpora.
 
+
+## Installation
+
+### Quick Install with Package Managers
+
+**Using [ubi](https://github.com/houseabsolute/ubi):**
+```bash
+ubi --project joshuascottpaul/build_tfidf --in ~/.local/bin
+```
+
+**Using [bin](https://github.com/marcosnils/bin):**
+```bash
+bin install github.com/joshuascottpaul/build_tfidf
+```
+
+### Manual Install
+
+```bash
+git clone https://github.com/joshuascottpaul/build_tfidf.git
+cd build_tfidf
+pip install -r requirements.txt  # if requirements.txt exists
+```
+
+### From Release
+
+```bash
+curl -L https://github.com/joshuascottpaul/build_tfidf/releases/latest/download/build_tfidf-v0.1.0-darwin-arm64.tar.gz | tar xz
+cd build_tfidf-darwin-arm64
+./install.sh
+```
+
 ## Quickstart
 ```bash
 python3.10 -m venv .venv
