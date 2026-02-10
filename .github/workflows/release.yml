@@ -1,44 +1,70 @@
-name: Release
+name: Create Release
 
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: true
+        default: 'v0.1.0'
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-      - name: Build source tarball
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install build
-          python -m build --sdist
-      - name: Compute sha256
-        id: sha
-        run: |
-          TAR_URL=https://github.com/joshuascottpaul/build_tfidf/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz
-          curl -L -o tag.tar.gz "$TAR_URL"
-          SHA=$(shasum -a 256 tag.tar.gz | awk '{print $1}')
-          echo "sha=$SHA" >> $GITHUB_OUTPUT
-      - name: Update tap formula
-        env:
-          TAP_REPO: joshuascottpaul/homebrew-build_tfidf
-          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-        run: |
-          git config --global user.email "ci@github.com"
-          git config --global user.name "build_tfidf-ci"
-          git clone https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git tap
-          TAR_URL=https://github.com/joshuascottpaul/build_tfidf/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz
-          FORMULA=tap/Formula/build-tfidf.rb
-          sed -i.bak "s|^  url .*|  url \"${TAR_URL}\"|" "$FORMULA"
-          sed -i.bak "s|^  sha256 .*|  sha256 \"${{ steps.sha.outputs.sha }}\"|" "$FORMULA"
-          rm -f "$FORMULA.bak"
-          cd tap
-          git add Formula/build-tfidf.rb
-          git commit -m "Update build-tfidf ${GITHUB_REF_NAME}"
-          git push
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Create packages
+      run: |
+        chmod +x package.sh
+        ./package.sh ${{ steps.version.outputs.VERSION }}
+    
+    - name: Create Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+        gh release create ${{ steps.version.outputs.VERSION }} \
+          dist/*.tar.gz \
+          --title "${{ steps.version.outputs.VERSION }}" \
+          --notes "Release ${{ steps.version.outputs.VERSION }}
+
+        ## Installation
+
+        ### Using ubi
+        \`\`\`bash
+        ubi --project ${{ github.repository }} --in ~/.local/bin
+        \`\`\`
+
+        ### Using bin
+        \`\`\`bash
+        bin install github.com/${{ github.repository }}
+        \`\`\`
+
+        ### Manual
+        \`\`\`bash
+        # Download for your platform (darwin-arm64 for Apple Silicon Mac)
+        curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${REPO_NAME}-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz | tar xz
+        cd ${REPO_NAME}-darwin-arm64
+        ./install.sh
+        \`\`\`
+
+        ## Requirements
+        - Python 3.7+
+        - See requirements.txt for Python dependencies
+
+        See [README.md](https://github.com/${{ github.repository }}#readme) for full documentation."
