@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  tfidf-search build --root ~/notes --remove-code\n"
             "\n"
             "  # Build including HTML and DOCX files (requires unstructured)\n"
-            "  tfidf-search build --root ~/notes --file-types md,html,docx\n"
+            "  tfidf-search build --root ~/notes --file-types md,txt,html,docx\n"
             "\n"
             "  # Build using local embeddings, no API key (requires fastembed)\n"
             "  EMBEDDING_PROVIDER=fastembed tfidf-search build\n"
@@ -85,12 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
             "\n"
             "  # Incrementally update after editing files\n"
             "  tfidf-search update\n"
-            "  tfidf-search update --root ~/notes --file-types md,html,docx\n"
+            "  tfidf-search update --root ~/notes --file-types md,txt,html,docx\n"
             "\n"
             "  # Watch corpus and auto-update on save (requires watchdog)\n"
             "  tfidf-search watch\n"
             "  tfidf-search watch --root ~/notes --debounce 2.0\n"
-            "  tfidf-search watch --root ~/notes --file-types md,html,docx\n"
+            "  tfidf-search watch --root ~/notes --file-types md,txt,html,docx\n"
             "\n"
             "  # Inspect a specific chunk by its sha256 id\n"
             "  tfidf-search inspect a3f1c2...\n"
@@ -108,12 +108,12 @@ def build_parser() -> argparse.ArgumentParser:
     b = sub.add_parser("build", help="build the index")
     b.add_argument("--root", default=".", help="root directory to scan")
     b.add_argument("--remove-code", action="store_true", help="strip code fences")
-    b.add_argument("--file-types", default="md", help="comma-separated file types (md,html,docx)")
+    b.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
 
     u = sub.add_parser("update", help="incrementally update the index")
     u.add_argument("--root", default=".", help="root directory to scan")
     u.add_argument("--remove-code", action="store_true", help="strip code fences")
-    u.add_argument("--file-types", default="md", help="comma-separated file types (md,html,docx)")
+    u.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
 
     q = sub.add_parser("query", help="query the index")
     q.add_argument("text", help="query text")
@@ -129,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
     w = sub.add_parser("watch", help="watch corpus and auto-update index on changes")
     w.add_argument("--root", default=".", help="root directory to watch")
     w.add_argument("--remove-code", action="store_true", help="strip code fences")
-    w.add_argument("--file-types", default="md", help="comma-separated file types (md,html,docx)")
+    w.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     w.add_argument("--debounce", type=float, default=1.5, help="debounce window in seconds")
 
     insp = sub.add_parser("inspect", help="inspect a chunk by id")

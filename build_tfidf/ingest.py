@@ -23,7 +23,7 @@ DEFAULT_EXCLUDE_DIRS = {
     ".eggs",
 }
 
-SUPPORTED_FILE_TYPES = {"md", "html", "docx"}
+SUPPORTED_FILE_TYPES = {"md", "txt", "html", "docx"}
 
 
 @dataclass(frozen=True)
