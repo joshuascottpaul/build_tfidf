@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
-
-from openai import OpenAI
 
 
 @dataclass(frozen=True)
@@ -19,6 +17,7 @@ class EmbeddingConfig:
     rpm_limit: int
     fallback_to_ollama: bool
     ollama_model: str
+    fastembed_model: str = "BAAI/bge-small-en-v1.5"
 
 
 def _rate_limit_sleep(last_call: float, rpm_limit: int) -> float:
@@ -33,6 +32,8 @@ def _rate_limit_sleep(last_call: float, rpm_limit: int) -> float:
 
 
 def embed_openai(texts: Iterable[str], config: EmbeddingConfig) -> list[list[float]]:
+    from openai import OpenAI
+
     client = OpenAI()
     batch = []
     out: list[list[float]] = []
@@ -49,7 +50,7 @@ def embed_openai(texts: Iterable[str], config: EmbeddingConfig) -> list[list[flo
             out.extend([row.embedding for row in resp.data])
             batch = []
     if batch:
-        last_call = _rate_limit_sleep(last_call, config.rpm_limit)
+        _rate_limit_sleep(last_call, config.rpm_limit)
         resp = client.embeddings.create(
             model=config.model,
             input=batch,
@@ -77,8 +78,21 @@ def embed_ollama(texts: Iterable[str], config: EmbeddingConfig) -> list[list[flo
     return out
 
 
+def embed_fastembed(texts: Iterable[str], config: EmbeddingConfig) -> list[list[float]]:
+    try:
+        from fastembed import TextEmbedding
+    except ImportError as exc:
+        raise ImportError(
+            "fastembed is not installed. Run: pip install fastembed"
+        ) from exc
+    model = TextEmbedding(model_name=config.fastembed_model)
+    return [vec.tolist() for vec in model.embed(list(texts))]
+
+
 def embed_texts(texts: Iterable[str], config: EmbeddingConfig) -> list[list[float]]:
     provider = config.provider.lower()
+    if provider == "fastembed":
+        return embed_fastembed(texts, config)
     if provider == "openai":
         try:
             return embed_openai(texts, config)
@@ -100,6 +114,7 @@ def load_config_from_env() -> EmbeddingConfig:
     rpm_limit = int(os.getenv("RPM_LIMIT", "60"))
     fallback_to_ollama = os.getenv("FALLBACK_TO_OLLAMA", "false").lower() == "true"
     ollama_model = os.getenv("OLLAMA_MODEL", "nomic-embed-text")
+    fastembed_model = os.getenv("FASTEMBED_MODEL", "BAAI/bge-small-en-v1.5")
     return EmbeddingConfig(
         provider=provider,
         model=model,
@@ -108,4 +123,5 @@ def load_config_from_env() -> EmbeddingConfig:
         rpm_limit=rpm_limit,
         fallback_to_ollama=fallback_to_ollama,
         ollama_model=ollama_model,
+        fastembed_model=fastembed_model,
     )

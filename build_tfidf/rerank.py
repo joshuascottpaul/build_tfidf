@@ -1,47 +1,27 @@
-"""Optional LLM re-ranking."""
+"""Cross-encoder re-ranking via flashrank."""
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Iterable
-
-from openai import OpenAI
 
 
 @dataclass(frozen=True)
 class RerankConfig:
-    model: str
-    top_n: int
+    model: str = "ms-marco-MiniLM-L-12-v2"
+    top_n: int = 10
 
 
 def rerank(query: str, candidates: Iterable[dict], config: RerankConfig) -> list[dict]:
-    candidates = list(candidates)
-    client = OpenAI()
-    payload = [{"id": c["sha256"], "text": c["text"]} for c in candidates]
-
-    prompt = (
-        "You are a ranking engine. Rank the candidate snippets by relevance to the query. "
-        "Return a JSON array of objects with fields id and score (0 to 1)."
-    )
-
-    resp = client.chat.completions.create(
-        model=config.model,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": f"Query: {query}"},
-            {"role": "user", "content": f"Candidates: {payload}"},
-        ],
-    )
-
-    text = resp.choices[0].message.content or ""
     try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]")
-        if start == -1 or end == -1:
-            return candidates
-        parsed = json.loads(text[start : end + 1])
-    scores = {item["id"]: item["score"] for item in parsed}
-    return sorted(candidates, key=lambda c: scores.get(c["sha256"], 0), reverse=True)
+        from flashrank import Ranker, RerankRequest
+    except ImportError as exc:
+        raise ImportError("flashrank is not installed. Run: pip install flashrank") from exc
+
+    candidates = list(candidates)
+    ranker = Ranker(model_name=config.model)
+    passages = [{"id": i, "text": c["text"]} for i, c in enumerate(candidates)]
+    result = ranker.rerank(RerankRequest(query=query, passages=passages))
+    ranked_ids = [r["id"] for r in result]
+    ordered = [candidates[i] for i in ranked_ids]
+    return ordered[: config.top_n]

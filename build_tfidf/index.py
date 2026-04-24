@@ -11,7 +11,7 @@ from typing import Iterable
 from .chunking import Chunk, chunk_text
 from .cleaning import clean_text
 from .embeddings import EmbeddingConfig, embed_texts
-from .ingest import DEFAULT_EXCLUDE_DIRS, iter_markdown_files, read_text_strict, sha256_text
+from .ingest import DEFAULT_EXCLUDE_DIRS, iter_files, iter_markdown_files, read_text_strict, sha256_text
 from .manifest import ManifestEntry, build_manifest, load_manifest
 from .lexical import LexicalIndex, build_index as build_lexical, search as search_lexical
 from .metadata import IndexMetadata, validate_signature
@@ -71,9 +71,10 @@ def build(
     weight_semantic: float = 0.7,
     weight_lexical: float = 0.3,
     remove_code: bool = False,
+    file_types: set[str] | None = None,
 ) -> None:
     _ensure_data_dir()
-    paths = iter_markdown_files(root, DEFAULT_EXCLUDE_DIRS)
+    paths = iter_files(root, file_types=file_types, exclude_dirs=DEFAULT_EXCLUDE_DIRS)
     all_chunks, path_texts = _build_chunks(paths, remove_code, chunk_size, chunk_overlap)
 
     if not all_chunks:
@@ -217,11 +218,12 @@ def update(
     weight_semantic: float = 0.7,
     weight_lexical: float = 0.3,
     remove_code: bool = False,
+    file_types: set[str] | None = None,
 ) -> None:
     _ensure_data_dir()
 
     if not META_PATH.exists():
-        build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code)
+        build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code, file_types)
         return
 
     meta = _load_json(META_PATH)
@@ -230,7 +232,7 @@ def update(
     if str(meta.get("cleaning_rules")) != expected_rules:
         raise SystemExit("Index config mismatch. Rebuild required.")
 
-    current_paths = iter_markdown_files(root, DEFAULT_EXCLUDE_DIRS)
+    current_paths = iter_files(root, file_types=file_types, exclude_dirs=DEFAULT_EXCLUDE_DIRS)
     full_manifest = _load_json(MANIFEST_PATH)
     entries = {e["path"]: e for e in full_manifest.get("entries", [])}
 
