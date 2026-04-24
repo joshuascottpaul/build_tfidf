@@ -113,12 +113,14 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--remove-code", action="store_true", help="strip code fences")
     b.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     b.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
+    b.add_argument("--fastembed-threads", type=int, default=None, help="limit fastembed CPU threads (e.g. 2 for cron jobs)")
 
     u = sub.add_parser("update", help="incrementally update the index")
     u.add_argument("--root", default=".", help="root directory to scan")
     u.add_argument("--remove-code", action="store_true", help="strip code fences")
     u.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     u.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
+    u.add_argument("--fastembed-threads", type=int, default=None, help="limit fastembed CPU threads (e.g. 2 for cron jobs)")
 
     q = sub.add_parser("query", help="query the index")
     q.add_argument("text", help="query text")
@@ -139,6 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     w.add_argument("--debounce", type=float, default=1.5, help="debounce window in seconds")
     w.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
+    w.add_argument("--fastembed-threads", type=int, default=None, help="limit fastembed CPU threads (e.g. 2 for cron jobs)")
 
     insp = sub.add_parser("inspect", help="inspect a chunk by id")
     insp.add_argument("chunk_id", help="chunk id")
@@ -233,7 +236,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     args = parser.parse_args(argv)
     provider = getattr(args, "embedding_provider", None)
-    cfg = load_config_from_env(provider_override=provider)
+    ft_threads = getattr(args, "fastembed_threads", None)
+    cfg = load_config_from_env(provider_override=provider, fastembed_threads=ft_threads)
 
     if args.cmd == "build":
         build_index(

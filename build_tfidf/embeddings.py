@@ -18,6 +18,7 @@ class EmbeddingConfig:
     fallback_to_ollama: bool
     ollama_model: str
     fastembed_model: str = "BAAI/bge-small-en-v1.5"
+    fastembed_threads: int | None = None
 
 
 def _rate_limit_sleep(last_call: float, rpm_limit: int) -> float:
@@ -85,7 +86,10 @@ def embed_fastembed(texts: Iterable[str], config: EmbeddingConfig) -> list[list[
         raise ImportError(
             "fastembed is not installed. Run: pip install fastembed"
         ) from exc
-    model = TextEmbedding(model_name=config.fastembed_model)
+    kwargs = {}
+    if config.fastembed_threads is not None:
+        kwargs["threads"] = config.fastembed_threads
+    model = TextEmbedding(model_name=config.fastembed_model, **kwargs)
     return [vec.tolist() for vec in model.embed(list(texts))]
 
 
@@ -105,7 +109,7 @@ def embed_texts(texts: Iterable[str], config: EmbeddingConfig) -> list[list[floa
     raise ValueError(f"Unknown embedding provider: {config.provider}")
 
 
-def load_config_from_env(provider_override: str | None = None) -> EmbeddingConfig:
+def load_config_from_env(provider_override: str | None = None, fastembed_threads: int | None = None) -> EmbeddingConfig:
     provider = provider_override or os.getenv("EMBEDDING_PROVIDER", "openai")
     model = os.getenv("OPENAI_MODEL", "text-embedding-3-large")
     dim_raw = os.getenv("DIMENSIONS", "")
@@ -115,6 +119,8 @@ def load_config_from_env(provider_override: str | None = None) -> EmbeddingConfi
     fallback_to_ollama = os.getenv("FALLBACK_TO_OLLAMA", "false").lower() == "true"
     ollama_model = os.getenv("OLLAMA_MODEL", "nomic-embed-text")
     fastembed_model = os.getenv("FASTEMBED_MODEL", "BAAI/bge-small-en-v1.5")
+    ft_raw = os.getenv("FASTEMBED_THREADS", "")
+    fastembed_threads = fastembed_threads or (int(ft_raw) if ft_raw else None)
     return EmbeddingConfig(
         provider=provider,
         model=model,
@@ -124,4 +130,5 @@ def load_config_from_env(provider_override: str | None = None) -> EmbeddingConfi
         fallback_to_ollama=fallback_to_ollama,
         ollama_model=ollama_model,
         fastembed_model=fastembed_model,
+        fastembed_threads=fastembed_threads,
     )
