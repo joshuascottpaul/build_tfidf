@@ -53,7 +53,7 @@ tfidf-search --query "your query"
 
 ### build
 ```
-tfidf-search build [--root DIR] [--remove-code] [--file-types md,html,docx]
+tfidf-search build [--root DIR] [--remove-code] [--file-types md,txt,html,docx]
 ```
 Builds the index from scratch. Defaults to `--root .` and `--file-types md`.
 
@@ -136,7 +136,7 @@ Available models: `ms-marco-MiniLM-L-12-v2` (default), `ms-marco-MultiBERT-L-12`
 
 ## Indexing non-Markdown files
 
-HTML and DOCX files are supported via [unstructured](https://github.com/Unstructured-IO/unstructured):
+Plain text (`.txt`) files are supported natively. HTML and DOCX files require [unstructured](https://github.com/Unstructured-IO/unstructured):
 
 ```bash
 pip install "build-tfidf[unstructured]"
