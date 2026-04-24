@@ -56,7 +56,9 @@ def chunk_text(
         if len(token_slice) > hard_cap:
             token_slice = token_slice[:hard_cap]
         chunk_text = enc.decode(token_slice)
-        char_pos = text.find(chunk_text[:50]) if chunk_text else 0
+        char_pos = text.find(chunk_text[:50]) if chunk_text else -1
+        if char_pos < 0:
+            char_pos = 0
         line_idx = 0
         for i, start in enumerate(line_offsets):
             if start <= char_pos:

@@ -49,15 +49,18 @@ def _build_chunks(
     remove_code: bool,
     chunk_size: int,
     chunk_overlap: int,
-) -> list[Chunk]:
+) -> tuple[list[Chunk], dict[str, str]]:
+    """Returns (chunks, path->text mapping) to avoid re-reading files."""
     all_chunks: list[Chunk] = []
+    texts: dict[str, str] = {}
     for path in paths:
         text = read_text_strict(path)
         if text is None:
             continue
+        texts[str(path)] = text
         cleaned = clean_text(text, remove_code=remove_code)
         all_chunks.extend(chunk_text(path, cleaned, max_tokens=chunk_size, overlap=chunk_overlap))
-    return all_chunks
+    return all_chunks, texts
 
 
 def build(
@@ -71,20 +74,20 @@ def build(
 ) -> None:
     _ensure_data_dir()
     paths = iter_markdown_files(root, DEFAULT_EXCLUDE_DIRS)
-    all_chunks = _build_chunks(paths, remove_code, chunk_size, chunk_overlap)
+    all_chunks, path_texts = _build_chunks(paths, remove_code, chunk_size, chunk_overlap)
 
     if not all_chunks:
         raise SystemExit("No chunks to index.")
 
-    vectors = embed_texts([c.text for c in all_chunks], embed_config)
+    chunk_texts = [c.text for c in all_chunks]
+    vectors = embed_texts(chunk_texts, embed_config)
     if not vectors or not vectors[0]:
         raise SystemExit("Embedding provider returned no vectors.")
     vindex = build_vector(vectors)
     save_vector(vindex, VEC_PATH)
     _save_vectors(vectors)
 
-    lex = build_lexical([c.text for c in all_chunks])
-    _save_json(LEX_PATH, {"texts": [c.text for c in all_chunks]})
+    _save_json(LEX_PATH, {"texts": chunk_texts})
 
     meta = IndexMetadata(
         schema_version=SCHEMA_VERSION,
@@ -100,19 +103,19 @@ def build(
     )
     _save_json(META_PATH, meta.to_dict())
 
-    manifest_entries = []
     chunk_map: dict[str, list[int]] = {}
     for idx, c in enumerate(all_chunks):
         chunk_map.setdefault(str(c.path), []).append(idx)
+
+    manifest_entries = []
     for path in paths:
-        text = read_text_strict(path)
+        text = path_texts.get(str(path))
         if text is None:
             continue
-        digest = sha256_text(text)
         manifest_entries.append(
             ManifestEntry(
                 path=str(path),
-                sha256=digest,
+                sha256=sha256_text(text),
                 mtime=path.stat().st_mtime,
                 chunk_indices=chunk_map.get(str(path), []),
             )
@@ -127,8 +130,7 @@ def build(
 
 def _load_lexical() -> LexicalIndex:
     data = _load_json(LEX_PATH)
-    texts = data["texts"]
-    return build_lexical(texts)
+    return build_lexical(data["texts"])
 
 
 def _save_vectors(vectors: list[list[float]]) -> None:
@@ -142,8 +144,7 @@ def _save_vectors(vectors: list[list[float]]) -> None:
 def _load_vectors() -> list[list[float]]:
     import numpy as np
 
-    arr = np.load(VECTORS_PATH)
-    return arr.tolist()
+    return np.load(VECTORS_PATH).tolist()
 
 
 def query(
@@ -161,30 +162,32 @@ def query(
 
     vindex = load_vector(VEC_PATH)
     query_vec = embed_texts([query_text], embed_config)[0]
-    sem_hits = search(vindex, query_vec, top_k=top_k * 5)
+    fetch_k = rerank_top_n if rerank_model else top_k
+    sem_hits = search(vindex, query_vec, top_k=fetch_k * 5)
     sem_scores = {idx: score for idx, score in sem_hits if idx >= 0}
 
     lex_index = _load_lexical()
-    lex_hits = search_lexical(lex_index, query_text, top_k=top_k * 5)
+    lex_hits = search_lexical(lex_index, query_text, top_k=fetch_k * 5)
     lex_scores = {idx: score for idx, score in lex_hits}
 
     fused = fuse_scores(sem_scores, lex_scores, weight_semantic, weight_lexical)
     manifest = _load_json(MANIFEST_PATH)
 
     results = []
-    for idx, score in fused[: max(top_k, rerank_top_n)]:
+    for idx, score in fused[:fetch_k]:
         chunk = manifest["chunks"][idx]
         results.append((chunk, score))
 
     if rerank_model:
         rerank_cfg = RerankConfig(model=rerank_model, top_n=rerank_top_n)
         reranked = rerank(query_text, [c for c, _ in results[:rerank_top_n]], rerank_cfg)
-        reranked_ids = {c["sha256"] for c in reranked[:top_k]}
-        reranked_set = [(c, s) for (c, s) in results if c["sha256"] in reranked_ids]
+        seen_ids: set[str] = {c["sha256"] for c in reranked[:top_k]}
+        reranked_set = [(c, s) for (c, s) in results if c["sha256"] in seen_ids]
         if len(reranked_set) < top_k:
             for item in results:
-                if item in reranked_set:
+                if item[0]["sha256"] in seen_ids:
                     continue
+                seen_ids.add(item[0]["sha256"])
                 reranked_set.append(item)
                 if len(reranked_set) >= top_k:
                     break
@@ -193,7 +196,7 @@ def query(
     if not dedupe_by_path:
         return results[:top_k]
 
-    seen = set()
+    seen: set[str] = set()
     deduped = []
     for chunk, score in results:
         path = chunk.get("path")
@@ -216,50 +219,49 @@ def update(
     remove_code: bool = False,
 ) -> None:
     _ensure_data_dir()
-    if META_PATH.exists():
-        meta = _load_json(META_PATH)
-        validate_signature(meta)
-        expected_rules = f"{CLEANING_RULES}|remove_code={remove_code}"
-        if str(meta.get("cleaning_rules")) != expected_rules:
-            raise SystemExit("Index config mismatch. Rebuild required.")
+
+    if not META_PATH.exists():
+        build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code)
+        return
+
+    meta = _load_json(META_PATH)
+    validate_signature(meta)
+    expected_rules = f"{CLEANING_RULES}|remove_code={remove_code}"
+    if str(meta.get("cleaning_rules")) != expected_rules:
+        raise SystemExit("Index config mismatch. Rebuild required.")
+
     current_paths = iter_markdown_files(root, DEFAULT_EXCLUDE_DIRS)
-    manifest = load_manifest(MANIFEST_PATH)
-    entries = {e["path"]: e for e in manifest.get("entries", [])}
+    full_manifest = _load_json(MANIFEST_PATH)
+    entries = {e["path"]: e for e in full_manifest.get("entries", [])}
 
     current_set = {str(p) for p in current_paths}
     previous_set = set(entries.keys())
-
-    changed_paths: list[Path] = []
     removed_paths = previous_set - current_set
 
+    changed_paths: list[Path] = []
+    path_texts: dict[str, str] = {}
     for path in current_paths:
         text = read_text_strict(path)
         if text is None:
             continue
+        path_texts[str(path)] = text
         sha = sha256_text(text)
         mtime = path.stat().st_mtime
         prev = entries.get(str(path))
         if not prev or prev["sha256"] != sha or prev["mtime"] != mtime:
             changed_paths.append(path)
 
-    if not entries:
-        build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code)
-        return
-
     if not changed_paths and not removed_paths:
         return
 
-    # Load existing artifacts
-    manifest = _load_json(MANIFEST_PATH)
-    existing_chunks: list[dict] = manifest.get("chunks", [])
+    existing_chunks: list[dict] = full_manifest.get("chunks", [])
     existing_vectors = _load_vectors()
     existing_texts = _load_json(LEX_PATH).get("texts", [])
 
-    # Filter out removed or changed paths
     remove_set = {str(p) for p in changed_paths} | set(removed_paths)
-    kept_chunks = []
-    kept_vectors = []
-    kept_texts = []
+    kept_chunks: list[dict] = []
+    kept_vectors: list[list[float]] = []
+    kept_texts: list[str] = []
     for idx, chunk in enumerate(existing_chunks):
         if chunk["path"] in remove_set:
             continue
@@ -267,45 +269,41 @@ def update(
         kept_vectors.append(existing_vectors[idx])
         kept_texts.append(existing_texts[idx])
 
-    # Rebuild chunks for changed paths
-    new_chunks = _build_chunks(changed_paths, remove_code, chunk_size, chunk_overlap)
+    new_chunks: list[Chunk] = []
+    for path in changed_paths:
+        text = path_texts.get(str(path))
+        if text is None:
+            continue
+        cleaned = clean_text(text, remove_code=remove_code)
+        new_chunks.extend(chunk_text(path, cleaned, max_tokens=chunk_size, overlap=chunk_overlap))
+
     if new_chunks:
         new_vectors = embed_texts([c.text for c in new_chunks], embed_config)
-    else:
-        new_vectors = []
+        for c, v in zip(new_chunks, new_vectors):
+            kept_chunks.append({**asdict(c), "path": str(c.path)})
+            kept_texts.append(c.text)
+            kept_vectors.append(v)
 
-    # Append new chunks and vectors
-    for c in new_chunks:
-        kept_chunks.append({**asdict(c), "path": str(c.path)})
-        kept_texts.append(c.text)
-    kept_vectors.extend(new_vectors)
-
-    # Persist updated artifacts
     _save_vectors(kept_vectors)
     vindex = build_vector(kept_vectors)
     save_vector(vindex, VEC_PATH)
     _save_json(LEX_PATH, {"texts": kept_texts})
 
-    # Rebuild manifest entries
     chunk_map: dict[str, list[int]] = {}
     for idx, c in enumerate(kept_chunks):
         chunk_map.setdefault(c["path"], []).append(idx)
+
     manifest_entries = []
     for path in current_paths:
-        text = read_text_strict(path)
+        text = path_texts.get(str(path))
         if text is None:
             continue
-        digest = sha256_text(text)
         manifest_entries.append(
             ManifestEntry(
                 path=str(path),
-                sha256=digest,
+                sha256=sha256_text(text),
                 mtime=path.stat().st_mtime,
                 chunk_indices=chunk_map.get(str(path), []),
             )
         )
-    new_manifest = {
-        "chunks": kept_chunks,
-        **build_manifest(manifest_entries),
-    }
-    _save_json(MANIFEST_PATH, new_manifest)
+    _save_json(MANIFEST_PATH, {"chunks": kept_chunks, **build_manifest(manifest_entries)})

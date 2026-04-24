@@ -23,6 +23,7 @@ def _patch_paths(monkeypatch, tmp_path: Path):
     data_dir = tmp_path / "data"
     monkeypatch.setattr(index, "DATA_DIR", data_dir)
     monkeypatch.setattr(index, "VEC_PATH", data_dir / "index.faiss")
+    monkeypatch.setattr(index, "VECTORS_PATH", data_dir / "vectors.npy")
     monkeypatch.setattr(index, "META_PATH", data_dir / "metadata.json")
     monkeypatch.setattr(index, "MANIFEST_PATH", data_dir / "manifest.json")
     monkeypatch.setattr(index, "LEX_PATH", data_dir / "lexical.json")
