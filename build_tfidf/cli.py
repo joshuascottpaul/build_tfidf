@@ -37,13 +37,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Semantic search for Markdown corpora.",
         epilog=(
-            "Examples:\n"
-            "  tfidf-search build --root /path/to/corpus\n"
-            "  tfidf-search build --file-types md,html,docx\n"
-            "  tfidf-search query \"your query\"\n"
-            "  tfidf-search \"your query\"  # shorthand\n"
-            "  tfidf-search update --remove-code\n"
-            "  tfidf-search watch --root .\n"
+            "Commands:\n"
+            "  build   --root DIR --file-types md,html,docx --remove-code\n"
+            "  update  --root DIR --file-types md,html,docx --remove-code\n"
+            "  query   TEXT --top N --rerank-model MODEL --rerank-top N\n"
+            "               --all-chunks --open N --reveal N --pbcopy N --paths-only\n"
+            "  watch   --root DIR --file-types md,html,docx --debounce SECS\n"
+            "  inspect CHUNK_ID\n"
+            "\n"
+            "Shorthand query:\n"
+            "  tfidf-search \"your query\"\n"
+            "  tfidf-search --query \"your query\"\n"
+            "\n"
+            "Embedding providers (EMBEDDING_PROVIDER env var):\n"
+            "  openai      OPENAI_API_KEY required (default)\n"
+            "  fastembed   local, no API key; pip install 'build-tfidf[fastembed]'\n"
+            "  ollama      requires running Ollama at localhost:11434\n"
+            "\n"
+            "Optional extras:\n"
+            "  pip install 'build-tfidf[fastembed]'    local embeddings\n"
+            "  pip install 'build-tfidf[flashrank]'    local re-ranking\n"
+            "  pip install 'build-tfidf[watchdog]'     watch command\n"
+            "  pip install 'build-tfidf[unstructured]' html/docx indexing\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

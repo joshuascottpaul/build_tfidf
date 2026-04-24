@@ -1,6 +1,6 @@
 # build_tfidf
 
-High-quality semantic search for Markdown corpora.
+High-quality hybrid semantic + lexical search for local Markdown corpora.
 
 
 ## Installation
@@ -44,65 +44,134 @@ pip install -e .
 tfidf-search build
 
 # Query
+tfidf-search "your query"
 tfidf-search query "your query"
-tfidf-search "your query"            # shorthand
-tfidf-search --query "your query"    # shorthand
+tfidf-search --query "your query"
 ```
 
 ## CLI
-- `tfidf-search build --root /path/to/corpus`
-- `tfidf-search update --remove-code`
-- `tfidf-search query "your query"`
-- `tfidf-search "your query"` (shorthand)
-- `tfidf-search --query "your query"` (shorthand)
-- `tfidf-search inspect <chunk_id>`
-Tips
-- Use `--remove-code` on build and update if you want code fences stripped.
-- Use `--open N` or `--reveal N` to open or show a result in Finder.
-- Use `--pbcopy N` to copy a result path and `--paths-only` for scripts.
-- Use `--all-chunks` to show multiple chunks per file.
+
+### build
+```
+tfidf-search build [--root DIR] [--remove-code] [--file-types md,html,docx]
+```
+Builds the index from scratch. Defaults to `--root .` and `--file-types md`.
+
+### update
+```
+tfidf-search update [--root DIR] [--remove-code] [--file-types md,html,docx]
+```
+Incrementally re-indexes only changed or new files.
+
+### query
+```
+tfidf-search query TEXT [--top N] [--rerank-model MODEL] [--rerank-top N]
+                        [--all-chunks] [--open N] [--reveal N] [--pbcopy N]
+                        [--paths-only]
+tfidf-search TEXT       # shorthand
+tfidf-search --query TEXT
+```
+- `--top N` — number of results (default 10)
+- `--rerank-model MODEL` — flashrank model name to re-rank results (e.g. `ms-marco-MiniLM-L-12-v2`)
+- `--all-chunks` — show multiple chunks per file instead of deduping by path
+- `--open N` — open result N in default app
+- `--reveal N` — reveal result N in Finder
+- `--pbcopy N` — copy result N path to clipboard
+- `--paths-only` — print file paths only (useful for scripts)
+
+### watch
+```
+tfidf-search watch [--root DIR] [--file-types md,html,docx] [--debounce SECS]
+```
+Watches the corpus directory and automatically runs `update` when files change.
+Rapid saves are debounced (default 1.5s) into a single update. Requires `watchdog`:
+```bash
+pip install "build-tfidf[watchdog]"
+```
+
+### inspect
+```
+tfidf-search inspect CHUNK_ID
+```
+Prints the stored chunk JSON for a given chunk sha256.
+
+## Embedding Providers
+
+### OpenAI (default)
+```bash
+export OPENAI_API_KEY=sk-...
+export EMBEDDING_PROVIDER=openai        # default
+export OPENAI_MODEL=text-embedding-3-large
+export DIMENSIONS=                      # optional, reduces output dims
+export BATCH_SIZE=32
+export RPM_LIMIT=60
+export FALLBACK_TO_OLLAMA=false
+```
+
+### fastembed — local, no API key
+```bash
+pip install "build-tfidf[fastembed]"
+export EMBEDDING_PROVIDER=fastembed
+export FASTEMBED_MODEL=BAAI/bge-small-en-v1.5   # default
+```
+Downloads model weights (~100MB) on first use. Fully offline after that.
+
+### Ollama
+```bash
+export EMBEDDING_PROVIDER=ollama
+export OLLAMA_MODEL=nomic-embed-text
+```
+Requires a running Ollama instance at `http://localhost:11434`.
+
+## Re-ranking
+
+Re-ranking uses [flashrank](https://github.com/PrithivirajDamodharan/FlashRank), a local cross-encoder. No API key required.
+
+```bash
+pip install "build-tfidf[flashrank]"
+tfidf-search query "your query" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 30
+```
+
+Available models: `ms-marco-MiniLM-L-12-v2` (default), `ms-marco-MultiBERT-L-12`, `rank-T5-flan`.
+
+## Indexing non-Markdown files
+
+HTML and DOCX files are supported via [unstructured](https://github.com/Unstructured-IO/unstructured):
+
+```bash
+pip install "build-tfidf[unstructured]"
+tfidf-search build --file-types md,html,docx
+tfidf-search watch --file-types md,html,docx
+```
+
+## Optional extras summary
+
+| Extra | Installs | Enables |
+|---|---|---|
+| `fastembed` | `fastembed` | Local embeddings, no API key |
+| `flashrank` | `flashrank` | Local cross-encoder re-ranking |
+| `watchdog` | `watchdog` | `tfidf-search watch` command |
+| `unstructured` | `unstructured[docx,html]` | Index `.html` and `.docx` files |
+
+Install multiple at once:
+```bash
+pip install "build-tfidf[fastembed,flashrank,watchdog]"
+```
 
 ## Dependency Pins and Rationale
 We pin versions for reliability and Homebrew compatibility.
 
-Current pins that matter most
-- `faiss-cpu==1.10.0`
-  - Reason: PyPI provides wheels but no source distribution for newer versions.
-  - Impact: Homebrew resource vendoring requires sdists, so this keeps brew installs viable.
+Current pins that matter most:
+- `faiss-cpu==1.10.0` — PyPI provides wheels but no sdist for newer versions; Homebrew requires sdists.
+- `openai==1.61.0` — OpenAI 2.x pulls `jiter` which requires Rust to build from sdist; Homebrew fails without Rust.
 
-- `openai==1.61.0`
-  - Reason: OpenAI 2.x depends on `jiter`, which requires Rust tooling to build from sdist.
-  - Impact: Homebrew builds from sdists and fails without Rust, so pinning avoids that.
-
-How we will address this in the future
-1. If `faiss-cpu` publishes sdists again, we will raise the pin and update Homebrew resources.
-2. If `openai` 2.x offers sdist that does not require Rust or ships wheels for all brew paths, we will upgrade.
-3. We will validate upgrades by running `brew reinstall build-tfidf` and `tfidf-search --help`.
-
-Homebrew note
-- We pin and list transitive runtime dependencies explicitly because Homebrew uses `pip --no-deps`.
-- This makes installs deterministic and avoids missing modules at runtime.
+Optional extras are unpinned — install them outside Homebrew.
 
 ## Notes
-- OpenAI embeddings require `OPENAI_API_KEY` in the environment.
-- For offline mode, set `EMBEDDING_PROVIDER=ollama`.
-- For fallback, set `FALLBACK_TO_OLLAMA=true` to fail over from OpenAI on errors.
 - If `tfidf-search` is not found, confirm your venv is active and run `pip install -e .`.
-- For tests, install dev deps with `pip install -r requirements-dev.txt`.
+- For tests: `pip install -r requirements-dev.txt && python3.10 -m pytest tests/`
 
 ## Homebrew Install Strategy
-Current approach
-- Homebrew installs binary wheels at install time using `pip --only-binary :all:` and `requirements.txt`.
-- Reason: sdists trigger build isolation and heavy native builds that fail or take hours on macOS.
-- Impact: install requires network access at brew time but keeps FAISS and quality intact.
-- Relocation note: Homebrew relocation fails for the `tiktoken` wheel. The formula skips relocation to avoid install errors.
-- Risk: binaries remain linked to their install path. If the Cellar moves, reinstall is required.
-
-Known issues addressed
-- `faiss-cpu` does not publish sdists, so vendoring fails in Homebrew.
-- `openai` 2.x pulls `jiter` which requires Rust builds from sdist.
-
-Future plan
-1. Transition to fully vendored wheel resources for all dependencies.
-2. Remove network requirement during brew install.
-3. Validate by running `brew reinstall build-tfidf` and `tfidf-search --help`.
+- Homebrew installs binary wheels at install time using `pip --only-binary :all:`.
+- `tiktoken` wheel relocation is skipped to avoid install errors.
+- Optional extras (`fastembed`, `flashrank`, etc.) are not part of the Homebrew formula — install them manually after `brew install`.
