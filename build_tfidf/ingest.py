@@ -21,6 +21,7 @@ DEFAULT_EXCLUDE_DIRS = {
     ".tox",
     ".ruff_cache",
     ".eggs",
+    ".tfidf-index",
 }
 
 SUPPORTED_FILE_TYPES = {"md", "txt", "html", "docx"}

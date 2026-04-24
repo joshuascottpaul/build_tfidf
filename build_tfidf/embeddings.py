@@ -105,8 +105,8 @@ def embed_texts(texts: Iterable[str], config: EmbeddingConfig) -> list[list[floa
     raise ValueError(f"Unknown embedding provider: {config.provider}")
 
 
-def load_config_from_env() -> EmbeddingConfig:
-    provider = os.getenv("EMBEDDING_PROVIDER", "openai")
+def load_config_from_env(provider_override: str | None = None) -> EmbeddingConfig:
+    provider = provider_override or os.getenv("EMBEDDING_PROVIDER", "openai")
     model = os.getenv("OPENAI_MODEL", "text-embedding-3-large")
     dim_raw = os.getenv("DIMENSIONS", "")
     dimensions = int(dim_raw) if dim_raw else None

@@ -49,15 +49,18 @@ def build_parser() -> argparse.ArgumentParser:
             "  tfidf-search build --root ~/notes --file-types md,txt,html,docx\n"
             "\n"
             "  # Build using local embeddings, no API key (requires fastembed)\n"
-            "  EMBEDDING_PROVIDER=fastembed tfidf-search build\n"
+            "  tfidf-search build --embedding-provider fastembed\n"
             "\n"
             "  # Build using Ollama embeddings\n"
-            "  EMBEDDING_PROVIDER=ollama OLLAMA_MODEL=nomic-embed-text tfidf-search build\n"
+            "  tfidf-search build --embedding-provider ollama\n"
             "\n"
             "  # Query — three equivalent shorthands\n"
             "  tfidf-search \"retrieval augmented generation\"\n"
             "  tfidf-search query \"retrieval augmented generation\"\n"
             "  tfidf-search --query \"retrieval augmented generation\"\n"
+            "\n"
+            "  # Query a specific corpus\n"
+            "  tfidf-search query \"chunking strategies\" --root ~/notes\n"
             "\n"
             "  # Query with more results\n"
             "  tfidf-search query \"chunking strategies\" --top 20\n"
@@ -109,14 +112,17 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--root", default=".", help="root directory to scan")
     b.add_argument("--remove-code", action="store_true", help="strip code fences")
     b.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
+    b.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
 
     u = sub.add_parser("update", help="incrementally update the index")
     u.add_argument("--root", default=".", help="root directory to scan")
     u.add_argument("--remove-code", action="store_true", help="strip code fences")
     u.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
+    u.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
 
     q = sub.add_parser("query", help="query the index")
     q.add_argument("text", help="query text")
+    q.add_argument("--root", default=".", help="root directory where index lives")
     q.add_argument("--top", type=int, default=10, help="number of results")
     q.add_argument("--rerank-model", default="", help="flashrank model name for re-ranking")
     q.add_argument("--rerank-top", type=int, default=30, help="rerank candidate count")
@@ -125,15 +131,18 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--reveal", dest="reveal_index", type=int, help="reveal result in Finder")
     q.add_argument("--pbcopy", dest="pbcopy_index", type=int, help="copy result path to clipboard")
     q.add_argument("--paths-only", action="store_true", help="print only file paths")
+    q.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
 
     w = sub.add_parser("watch", help="watch corpus and auto-update index on changes")
     w.add_argument("--root", default=".", help="root directory to watch")
     w.add_argument("--remove-code", action="store_true", help="strip code fences")
     w.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     w.add_argument("--debounce", type=float, default=1.5, help="debounce window in seconds")
+    w.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
 
     insp = sub.add_parser("inspect", help="inspect a chunk by id")
     insp.add_argument("chunk_id", help="chunk id")
+    insp.add_argument("--root", default=".", help="root directory where index lives")
 
     return parser
 
@@ -223,7 +232,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
     args = parser.parse_args(argv)
-    cfg = load_config_from_env()
+    provider = getattr(args, "embedding_provider", None)
+    cfg = load_config_from_env(provider_override=provider)
 
     if args.cmd == "build":
         build_index(
@@ -256,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         results = query_index(
             query_text,
             cfg,
+            root=Path(args.root),
             top_k=args.top,
             rerank_model=rerank_model,
             rerank_top_n=args.rerank_top,
@@ -292,9 +303,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "inspect":
-        from .index import MANIFEST_PATH, _load_json
+        from .index import _manifest_path, _load_json
 
-        manifest = _load_json(MANIFEST_PATH)
+        manifest = _load_json(_manifest_path(Path(args.root)))
         for chunk in manifest.get("chunks", []):
             if chunk["sha256"] == args.chunk_id:
                 print(json.dumps(chunk, indent=2))

@@ -20,20 +20,38 @@ from .scoring import fuse_scores
 from .vector_store import VectorIndex, build_index as build_vector, load as load_vector, save as save_vector, search
 
 
-DATA_DIR = Path("build_tfidf/data")
-VEC_PATH = DATA_DIR / "index.faiss"
-VECTORS_PATH = DATA_DIR / "vectors.npy"
-META_PATH = DATA_DIR / "metadata.json"
-MANIFEST_PATH = DATA_DIR / "manifest.json"
-LEX_PATH = DATA_DIR / "lexical.json"
-
+INDEX_DIR_NAME = ".tfidf-index"
 
 SCHEMA_VERSION = 1
 CLEANING_RULES = "front_matter,optional_code_fences,normalize_whitespace"
 
 
-def _ensure_data_dir() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+def _data_dir(root: Path) -> Path:
+    return root / INDEX_DIR_NAME
+
+
+def _vec_path(root: Path) -> Path:
+    return _data_dir(root) / "index.faiss"
+
+
+def _vectors_path(root: Path) -> Path:
+    return _data_dir(root) / "vectors.npy"
+
+
+def _meta_path(root: Path) -> Path:
+    return _data_dir(root) / "metadata.json"
+
+
+def _manifest_path(root: Path) -> Path:
+    return _data_dir(root) / "manifest.json"
+
+
+def _lex_path(root: Path) -> Path:
+    return _data_dir(root) / "lexical.json"
+
+
+def _ensure_data_dir(root: Path) -> None:
+    _data_dir(root).mkdir(parents=True, exist_ok=True)
 
 
 def _save_json(path: Path, payload: dict) -> None:
@@ -73,7 +91,7 @@ def build(
     remove_code: bool = False,
     file_types: set[str] | None = None,
 ) -> None:
-    _ensure_data_dir()
+    _ensure_data_dir(root)
     paths = iter_files(root, file_types=file_types, exclude_dirs=DEFAULT_EXCLUDE_DIRS)
     all_chunks, path_texts = _build_chunks(paths, remove_code, chunk_size, chunk_overlap)
 
@@ -85,10 +103,10 @@ def build(
     if not vectors or not vectors[0]:
         raise SystemExit("Embedding provider returned no vectors.")
     vindex = build_vector(vectors)
-    save_vector(vindex, VEC_PATH)
-    _save_vectors(vectors)
+    save_vector(vindex, _vec_path(root))
+    _save_vectors(vectors, root)
 
-    _save_json(LEX_PATH, {"texts": chunk_texts})
+    _save_json(_lex_path(root), {"texts": chunk_texts})
 
     meta = IndexMetadata(
         schema_version=SCHEMA_VERSION,
@@ -102,7 +120,7 @@ def build(
         weight_semantic=weight_semantic,
         weight_lexical=weight_lexical,
     )
-    _save_json(META_PATH, meta.to_dict())
+    _save_json(_meta_path(root), meta.to_dict())
 
     chunk_map: dict[str, list[int]] = {}
     for idx, c in enumerate(all_chunks):
@@ -126,31 +144,32 @@ def build(
         "chunks": [{**asdict(c), "path": str(c.path)} for c in all_chunks],
         **build_manifest(manifest_entries),
     }
-    _save_json(MANIFEST_PATH, manifest)
+    _save_json(_manifest_path(root), manifest)
 
 
-def _load_lexical() -> LexicalIndex:
-    data = _load_json(LEX_PATH)
+def _load_lexical(root: Path) -> LexicalIndex:
+    data = _load_json(_lex_path(root))
     return build_lexical(data["texts"])
 
 
-def _save_vectors(vectors: list[list[float]]) -> None:
+def _save_vectors(vectors: list[list[float]], root: Path) -> None:
     import numpy as np
 
     arr = np.array(vectors, dtype="float32")
-    VECTORS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    np.save(VECTORS_PATH, arr)
+    _data_dir(root).mkdir(parents=True, exist_ok=True)
+    np.save(_vectors_path(root), arr)
 
 
-def _load_vectors() -> list[list[float]]:
+def _load_vectors(root: Path) -> list[list[float]]:
     import numpy as np
 
-    return np.load(VECTORS_PATH).tolist()
+    return np.load(_vectors_path(root)).tolist()
 
 
 def query(
     query_text: str,
     embed_config: EmbeddingConfig,
+    root: Path = Path("."),
     top_k: int = 10,
     weight_semantic: float = 0.7,
     weight_lexical: float = 0.3,
@@ -158,21 +177,21 @@ def query(
     rerank_top_n: int = 30,
     dedupe_by_path: bool = True,
 ) -> list[tuple[dict, float]]:
-    meta = _load_json(META_PATH)
+    meta = _load_json(_meta_path(root))
     validate_signature(meta)
 
-    vindex = load_vector(VEC_PATH)
+    vindex = load_vector(_vec_path(root))
     query_vec = embed_texts([query_text], embed_config)[0]
     fetch_k = rerank_top_n if rerank_model else top_k
     sem_hits = search(vindex, query_vec, top_k=fetch_k * 5)
     sem_scores = {idx: score for idx, score in sem_hits if idx >= 0}
 
-    lex_index = _load_lexical()
+    lex_index = _load_lexical(root)
     lex_hits = search_lexical(lex_index, query_text, top_k=fetch_k * 5)
     lex_scores = {idx: score for idx, score in lex_hits}
 
     fused = fuse_scores(sem_scores, lex_scores, weight_semantic, weight_lexical)
-    manifest = _load_json(MANIFEST_PATH)
+    manifest = _load_json(_manifest_path(root))
 
     results = []
     for idx, score in fused[:fetch_k]:
@@ -220,20 +239,20 @@ def update(
     remove_code: bool = False,
     file_types: set[str] | None = None,
 ) -> None:
-    _ensure_data_dir()
+    _ensure_data_dir(root)
 
-    if not META_PATH.exists():
+    if not _meta_path(root).exists():
         build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code, file_types)
         return
 
-    meta = _load_json(META_PATH)
+    meta = _load_json(_meta_path(root))
     validate_signature(meta)
     expected_rules = f"{CLEANING_RULES}|remove_code={remove_code}"
     if str(meta.get("cleaning_rules")) != expected_rules:
         raise SystemExit("Index config mismatch. Rebuild required.")
 
     current_paths = iter_files(root, file_types=file_types, exclude_dirs=DEFAULT_EXCLUDE_DIRS)
-    full_manifest = _load_json(MANIFEST_PATH)
+    full_manifest = _load_json(_manifest_path(root))
     entries = {e["path"]: e for e in full_manifest.get("entries", [])}
 
     current_set = {str(p) for p in current_paths}
@@ -257,8 +276,8 @@ def update(
         return
 
     existing_chunks: list[dict] = full_manifest.get("chunks", [])
-    existing_vectors = _load_vectors()
-    existing_texts = _load_json(LEX_PATH).get("texts", [])
+    existing_vectors = _load_vectors(root)
+    existing_texts = _load_json(_lex_path(root)).get("texts", [])
 
     remove_set = {str(p) for p in changed_paths} | set(removed_paths)
     kept_chunks: list[dict] = []
@@ -286,10 +305,10 @@ def update(
             kept_texts.append(c.text)
             kept_vectors.append(v)
 
-    _save_vectors(kept_vectors)
+    _save_vectors(kept_vectors, root)
     vindex = build_vector(kept_vectors)
-    save_vector(vindex, VEC_PATH)
-    _save_json(LEX_PATH, {"texts": kept_texts})
+    save_vector(vindex, _vec_path(root))
+    _save_json(_lex_path(root), {"texts": kept_texts})
 
     chunk_map: dict[str, list[int]] = {}
     for idx, c in enumerate(kept_chunks):
@@ -308,4 +327,4 @@ def update(
                 chunk_indices=chunk_map.get(str(path), []),
             )
         )
-    _save_json(MANIFEST_PATH, {"chunks": kept_chunks, **build_manifest(manifest_entries)})
+    _save_json(_manifest_path(root), {"chunks": kept_chunks, **build_manifest(manifest_entries)})

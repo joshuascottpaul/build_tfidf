@@ -24,12 +24,6 @@ def test_update_incremental(monkeypatch, tmp_path: Path):
         return [vec(t) for t in texts]
 
     monkeypatch.setattr(index, "embed_texts", _fake_embed)
-    monkeypatch.setattr(index, "DATA_DIR", tmp_path / "data")
-    monkeypatch.setattr(index, "VEC_PATH", index.DATA_DIR / "index.faiss")
-    monkeypatch.setattr(index, "VECTORS_PATH", index.DATA_DIR / "vectors.npy")
-    monkeypatch.setattr(index, "META_PATH", index.DATA_DIR / "metadata.json")
-    monkeypatch.setattr(index, "MANIFEST_PATH", index.DATA_DIR / "manifest.json")
-    monkeypatch.setattr(index, "LEX_PATH", index.DATA_DIR / "lexical.json")
 
     cfg = EmbeddingConfig(
         provider="openai",
