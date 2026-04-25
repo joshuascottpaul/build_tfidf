@@ -10,7 +10,7 @@ from pathlib import Path
 from .embeddings import load_config_from_env
 from .index import build as build_index
 from .index import update as update_index
-from .index import query as query_index
+from .index import query as search_index
 
 
 def _check_runtime() -> None:
@@ -54,25 +54,25 @@ def build_parser() -> argparse.ArgumentParser:
             "  # Build using Ollama embeddings\n"
             "  tfidf-search build --embedding-provider ollama\n"
             "\n"
-            "  # Query — three equivalent shorthands\n"
+            "  # Search — three equivalent shorthands\n"
             "  tfidf-search \"retrieval augmented generation\"\n"
-            "  tfidf-search query \"retrieval augmented generation\"\n"
-            "  tfidf-search --query \"retrieval augmented generation\"\n"
+            "  tfidf-search search \"retrieval augmented generation\"\n"
+            "  tfidf-search --search \"retrieval augmented generation\"\n"
             "\n"
-            "  # Query a specific corpus\n"
-            "  tfidf-search query \"chunking strategies\" --root ~/notes\n"
+            "  # Search a specific corpus\n"
+            "  tfidf-search search \"chunking strategies\" --root ~/notes\n"
             "\n"
-            "  # Query with more results\n"
-            "  tfidf-search query \"chunking strategies\" --top 20\n"
+            "  # Search with more results\n"
+            "  tfidf-search search \"chunking strategies\" --top 20\n"
             "\n"
-            "  # Query and re-rank with a local cross-encoder (requires flashrank)\n"
-            "  tfidf-search query \"chunking strategies\" --rerank-model ms-marco-MiniLM-L-12-v2\n"
+            "  # Search and re-rank with a local cross-encoder (requires flashrank)\n"
+            "  tfidf-search search \"chunking strategies\" --rerank-model ms-marco-MiniLM-L-12-v2\n"
             "\n"
-            "  # Query and re-rank with a larger candidate pool\n"
-            "  tfidf-search query \"chunking strategies\" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 50\n"
+            "  # Search and re-rank with a larger candidate pool\n"
+            "  tfidf-search search \"chunking strategies\" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 50\n"
             "\n"
             "  # Show all matching chunks, not just one per file\n"
-            "  tfidf-search query \"embedding models\" --all-chunks\n"
+            "  tfidf-search search \"embedding models\" --all-chunks\n"
             "\n"
             "  # Open the top result in your default app\n"
             "  tfidf-search \"vector databases\" --open 1\n"
@@ -84,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  tfidf-search \"vector databases\" --pbcopy 1\n"
             "\n"
             "  # Print paths only (pipe-friendly)\n"
-            "  tfidf-search query \"FAISS\" --paths-only | xargs grep -l 'IndexFlat'\n"
+            "  tfidf-search search \"FAISS\" --paths-only | xargs grep -l 'IndexFlat'\n"
             "\n"
             "  # Incrementally update after editing files\n"
             "  tfidf-search update\n"
@@ -122,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
     u.add_argument("--fastembed-threads", type=int, default=None, help="limit fastembed CPU threads (e.g. 2 for cron jobs)")
 
-    q = sub.add_parser("query", help="query the index")
+    q = sub.add_parser("search", help="search the index")
     q.add_argument("text", help="query text")
     q.add_argument("--root", default=".", help="root directory where index lives")
     q.add_argument("--top", type=int, default=10, help="number of results")
@@ -150,13 +150,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _inject_shorthand_query(argv: list[str] | None) -> list[str]:
+def _inject_shorthand_search(argv: list[str] | None) -> list[str]:
     if not argv:
         return []
-    if "--query" in argv and "query" not in argv and "build" not in argv and "update" not in argv and "inspect" not in argv and "watch" not in argv:
-        idx = argv.index("--query")
+    if "--search" in argv and "search" not in argv and "build" not in argv and "update" not in argv and "inspect" not in argv and "watch" not in argv:
+        idx = argv.index("--search")
         if idx + 1 >= len(argv):
-            return ["query"]
+            return ["search"]
         value = argv[idx + 1]
         rest: list[str] = []
         skip = {idx, idx + 1}
@@ -164,14 +164,14 @@ def _inject_shorthand_query(argv: list[str] | None) -> list[str]:
             if i in skip:
                 continue
             rest.append(token)
-        return ["query", value, *rest]
+        return ["search", value, *rest]
     if argv[0].startswith("-"):
         return argv
-    if argv[0] in {"build", "update", "query", "inspect", "watch"}:
+    if argv[0] in {"build", "update", "search", "inspect", "watch"}:
         return argv
     if any(token.startswith("-") for token in argv[1:]):
-        return ["query", *argv]
-    return ["query", " ".join(argv)]
+        return ["search", *argv]
+    return ["search", " ".join(argv)]
 
 
 def _run_watch(root: Path, cfg, remove_code: bool, file_types: set[str], debounce: float) -> None:
@@ -230,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     if argv is None:
         argv = sys.argv[1:]
-    argv = _inject_shorthand_query(argv)
+    argv = _inject_shorthand_search(argv)
     if not argv:
         parser.print_help()
         return 0
@@ -264,10 +264,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    if args.cmd == "query":
+    if args.cmd == "search":
         query_text = args.text
         rerank_model = args.rerank_model.strip() or None
-        results = query_index(
+        results = search_index(
             query_text,
             cfg,
             root=Path(args.root),

@@ -12,17 +12,17 @@ def test_cli_build_smoke(monkeypatch, tmp_path):
     assert rc == 0
 
 
-def test_cli_query_shorthand(monkeypatch):
-    def _noop_query(*args, **kwargs):
+def test_cli_search_shorthand(monkeypatch):
+    def _noop_search(*args, **kwargs):
         return []
 
-    monkeypatch.setattr(cli, "query_index", _noop_query)
-    rc = cli.main(["--query", "uncertainty"])
+    monkeypatch.setattr(cli, "search_index", _noop_search)
+    rc = cli.main(["--search", "uncertainty"])
     assert rc == 0
 
 
-def test_cli_query_shorthand_with_open(monkeypatch):
-    def _noop_query(*args, **kwargs):
+def test_cli_search_shorthand_with_open(monkeypatch):
+    def _noop_search(*args, **kwargs):
         return [({"path": "/tmp/a.md"}, 0.5)]
 
     import subprocess
@@ -33,7 +33,7 @@ def test_cli_query_shorthand_with_open(monkeypatch):
         calls.append(args)
         return None
 
-    monkeypatch.setattr(cli, "query_index", _noop_query)
+    monkeypatch.setattr(cli, "search_index", _noop_search)
     monkeypatch.setattr(subprocess, "run", _fake_run)
     rc = cli.main(["uncertainty", "--open", "1"])
     assert rc == 0
@@ -47,36 +47,36 @@ def test_cli_no_args_shows_help(monkeypatch, capsys):
     assert "usage:" in out.out
 
 
-def test_cli_query_all_chunks(monkeypatch):
-    def _noop_query(*args, **kwargs):
+def test_cli_search_all_chunks(monkeypatch):
+    def _noop_search(*args, **kwargs):
         assert kwargs.get("dedupe_by_path") is False
         return []
 
-    monkeypatch.setattr(cli, "query_index", _noop_query)
-    rc = cli.main(["query", "uncertainty", "--all-chunks"])
+    monkeypatch.setattr(cli, "search_index", _noop_search)
+    rc = cli.main(["search", "uncertainty", "--all-chunks"])
     assert rc == 0
 
 
-def test_cli_query_open_invalid(monkeypatch):
-    def _noop_query(*args, **kwargs):
+def test_cli_search_open_invalid(monkeypatch):
+    def _noop_search(*args, **kwargs):
         return [({"path": "/tmp/a.md"}, 0.5)]
 
-    monkeypatch.setattr(cli, "query_index", _noop_query)
+    monkeypatch.setattr(cli, "search_index", _noop_search)
     try:
-        cli.main(["query", "uncertainty", "--open", "2"])
+        cli.main(["search", "uncertainty", "--open", "2"])
     except SystemExit:
         assert True
     else:
         assert False
 
 
-def test_cli_query_pbcopy_invalid(monkeypatch):
-    def _noop_query(*args, **kwargs):
+def test_cli_search_pbcopy_invalid(monkeypatch):
+    def _noop_search(*args, **kwargs):
         return [({"path": "/tmp/a.md"}, 0.5)]
 
-    monkeypatch.setattr(cli, "query_index", _noop_query)
+    monkeypatch.setattr(cli, "search_index", _noop_search)
     try:
-        cli.main(["query", "uncertainty", "--pbcopy", "2"])
+        cli.main(["search", "uncertainty", "--pbcopy", "2"])
     except SystemExit:
         assert True
     else:
