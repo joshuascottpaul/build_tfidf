@@ -247,7 +247,7 @@ $('searchForm').addEventListener('submit', async (e) => {
     for (const r of data.results) {
       const div = document.createElement('div');
       div.className = 'result';
-      let html = '<div class="result-path">' + esc(r.path) + '</div>';
+      let html = '<div class="result-path">' + esc(r.filename) + ' <span style="color:#9ca3af">' + esc(r.path) + '</span></div>';
       if (r.heading) html += '<div class="result-heading">' + esc(r.heading) + '</div>';
       html += '<div class="result-score">score: ' + r.score.toFixed(4) + '</div>';
       if (r.text) html += '<div class="result-text">' + esc(r.text.slice(0, 300)) + '</div>';
@@ -337,6 +337,28 @@ def create_app(root: Path, embed_config):
             return jsonify(error=str(exc)), 500
         return jsonify(ok=True)
 
+    @app.route("/api/delete", methods=["POST"])
+    def api_delete():
+        body = request.get_json(silent=True) or {}
+        filename = body.get("filename", "").strip()
+        if not filename:
+            return jsonify(error="filename is required"), 400
+        # Resolve against root, block path traversal
+        target = (root / filename).resolve()
+        if not str(target).startswith(str(root.resolve())):
+            return jsonify(error="Invalid filename"), 400
+        if not target.exists():
+            return jsonify(error="File not found"), 404
+        target.unlink()
+        # Rebuild index without the deleted file
+        if _has_index():
+            opts = _parse_build_opts({})
+            try:
+                _update(root, embed_config, **opts)
+            except Exception as exc:
+                return jsonify(error=str(exc)), 500
+        return jsonify(ok=True)
+
     @app.route("/api/search")
     def api_search():
         q = request.args.get("q", "").strip()
@@ -364,6 +386,7 @@ def create_app(root: Path, embed_config):
         return jsonify(results=[
             {
                 "path": chunk.get("path", ""),
+                "filename": Path(chunk.get("path", "")).name,
                 "heading": chunk.get("heading", ""),
                 "text": chunk.get("text", ""),
                 "score": round(score, 4),

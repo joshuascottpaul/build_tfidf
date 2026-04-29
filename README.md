@@ -231,6 +231,12 @@ Current pins that matter most:
 
 Optional extras are unpinned — install them outside Homebrew.
 
+## Further reading
+
+- [QUICKSTART.md](QUICKSTART.md) -- get running in under 5 minutes (CLI, web UI, API, and FileMaker integration)
+- [API.md](API.md) -- full HTTP API reference for the `serve` command
+- [CHEATSHEET.md](CHEATSHEET.md) -- CLI command reference
+
 ## Notes
 - If `tfidf-search` is not found, confirm your venv is active and run `pip install -e .`.
 - For tests: `pip install -r requirements-dev.txt && python3.10 -m pytest tests/`
