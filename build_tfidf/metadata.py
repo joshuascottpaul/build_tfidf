@@ -19,12 +19,14 @@ class IndexMetadata:
     vector_backend: str
     weight_semantic: float
     weight_lexical: float
+    chunking_strategy: str = "token"
 
     def signature(self) -> str:
         raw = (
             f"{self.schema_version}|{self.embedding_model}|{self.embedding_dimensions}|"
             f"{self.chunk_size}|{self.chunk_overlap}|{self.cleaning_rules}|"
-            f"{self.vector_backend}|{self.weight_semantic}|{self.weight_lexical}"
+            f"{self.vector_backend}|{self.weight_semantic}|{self.weight_lexical}|"
+            f"{self.chunking_strategy}"
         )
         return sha256(raw.encode("utf-8")).hexdigest()
 
@@ -62,6 +64,7 @@ def validate_signature(meta: dict[str, Any]) -> None:
         vector_backend=str(meta["vector_backend"]),
         weight_semantic=float(meta["weight_semantic"]),
         weight_lexical=float(meta["weight_lexical"]),
+        chunking_strategy=str(meta.get("chunking_strategy", "token")),
     )
     if derived.signature() != meta["index_signature"]:
         raise ValueError("Index signature mismatch. Rebuild required.")
