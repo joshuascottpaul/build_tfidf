@@ -22,6 +22,15 @@
 - Show help on no args.
 - Fix shorthand query parsing.
 
+## 0.1.11
+- Add Reciprocal Rank Fusion (`--fusion rrf`) as alternative to min-max score normalization.
+- Batch Ollama embeddings via `/api/embed` endpoint with fallback to legacy API.
+- Per-provider default fusion weights (openai 0.7/0.3, fastembed/ollama 0.6/0.4).
+- Add `--weight-semantic` and `--weight-lexical` overrides for search.
+- Add semantic chunking (`--chunking semantic`) for topic-boundary splitting.
+- Add HyDE query expansion (`--hyde`) for better recall on short queries.
+- Fix brew CI job to tolerate native extension relocation warnings.
+
 ## 0.1.10
 - Preserve flags in shorthand queries like `--open` and `--pbcopy`.
 - Expand CLI help examples and query options.

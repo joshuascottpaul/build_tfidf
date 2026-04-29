@@ -13,27 +13,32 @@ pip install -e .
 tfidf-search build
 tfidf-search build --root /path/to/corpus
 tfidf-search build --remove-code
+tfidf-search build --chunking semantic
+tfidf-search build --embedding-provider fastembed
 ```
 
 ## Update
 ```bash
 tfidf-search update
 tfidf-search update --root /path/to/corpus
-tfidf-search update --remove-code
+tfidf-search update --chunking semantic
 ```
 
-## Query
+## Search
 ```bash
-tfidf-search query "your query"
-tfidf-search "your query"            # shorthand
-tfidf-search --query "your query"    # shorthand
-tfidf-search query "your query" --top 10
-tfidf-search query "your query" --rerank-model gpt-4o-mini --rerank-top 30
-tfidf-search query "your query" --open 1
-tfidf-search query "your query" --reveal 1
-tfidf-search query "your query" --pbcopy 1
-tfidf-search query "your query" --paths-only
-tfidf-search query "your query" --all-chunks
+tfidf-search search "your query"
+tfidf-search "your query"              # shorthand
+tfidf-search --search "your query"     # shorthand
+tfidf-search search "your query" --top 10
+tfidf-search search "your query" --fusion rrf
+tfidf-search search "your query" --hyde
+tfidf-search search "your query" --weight-semantic 0.8 --weight-lexical 0.2
+tfidf-search search "your query" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 30
+tfidf-search search "your query" --open 1
+tfidf-search search "your query" --reveal 1
+tfidf-search search "your query" --pbcopy 1
+tfidf-search search "your query" --paths-only
+tfidf-search search "your query" --all-chunks
 ```
 
 ## Inspect
@@ -44,7 +49,8 @@ tfidf-search inspect <chunk_id>
 ## Env
 ```bash
 export OPENAI_API_KEY="..."
-export EMBEDDING_PROVIDER=openai
+export EMBEDDING_PROVIDER=openai       # openai, fastembed, ollama
 export FALLBACK_TO_OLLAMA=true
 export OLLAMA_MODEL=nomic-embed-text
+export HYDE_MODEL=gpt-4o-mini          # or llama3.2 for Ollama
 ```

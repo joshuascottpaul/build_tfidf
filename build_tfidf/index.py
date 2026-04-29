@@ -6,19 +6,17 @@ import json
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
-
 from .chunking import Chunk, chunk_text, chunk_text_semantic
 from .cleaning import clean_text
 from .embeddings import EmbeddingConfig, embed_texts
 from .hyde import generate_hypothetical
-from .ingest import DEFAULT_EXCLUDE_DIRS, iter_files, iter_markdown_files, read_text_strict, sha256_text
-from .manifest import ManifestEntry, build_manifest, load_manifest
+from .ingest import DEFAULT_EXCLUDE_DIRS, iter_files, read_text_strict, sha256_text
+from .manifest import ManifestEntry, build_manifest
 from .lexical import LexicalIndex, build_index as build_lexical, search as search_lexical
 from .metadata import IndexMetadata, validate_signature
 from .rerank import RerankConfig, rerank
 from .scoring import fuse_scores
-from .vector_store import VectorIndex, build_index as build_vector, load as load_vector, save as save_vector, search
+from .vector_store import build_index as build_vector, load as load_vector, save as save_vector, search
 
 
 INDEX_DIR_NAME = ".tfidf-index"
