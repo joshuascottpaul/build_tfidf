@@ -43,10 +43,10 @@ pip install -e .
 # Build index
 tfidf-search build
 
-# Query
+# Search
 tfidf-search "your query"
-tfidf-search query "your query"
-tfidf-search --query "your query"
+tfidf-search search "your query"
+tfidf-search --search "your query"
 ```
 
 ## CLI
