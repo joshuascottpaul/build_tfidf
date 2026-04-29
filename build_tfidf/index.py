@@ -108,12 +108,12 @@ def build(
     )
 
     if not all_chunks:
-        raise SystemExit("No chunks to index.")
+        raise ValueError("No chunks to index. Check that the corpus contains files matching the specified file types.")
 
     chunk_texts = [c.text for c in all_chunks]
     vectors = embed_texts(chunk_texts, embed_config)
     if not vectors or not vectors[0]:
-        raise SystemExit("Embedding provider returned no vectors.")
+        raise ValueError("Embedding provider returned no vectors. Check your API key or provider configuration.")
     vindex = build_vector(vectors)
     save_vector(vindex, _vec_path(root))
     _save_vectors(vectors, root)

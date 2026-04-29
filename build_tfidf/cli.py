@@ -16,17 +16,18 @@ from .index import query as search_index
 def _check_runtime() -> None:
     if sys.version_info < (3, 10):
         raise SystemExit("Python 3.10+ is required. Please upgrade your Python.")
-    try:
-        import numpy  # noqa: F401
-        import faiss  # noqa: F401
-        import tiktoken  # noqa: F401
-        import pydantic  # noqa: F401
-        import rank_bm25  # noqa: F401
-    except Exception as exc:
+    missing = []
+    for mod in ("numpy", "faiss", "tiktoken", "pydantic", "rank_bm25"):
+        try:
+            __import__(mod)
+        except ImportError:
+            missing.append(mod)
+    if missing:
         raise SystemExit(
-            "Missing required dependencies. Activate your venv and run: "
-            "pip install -r requirements.txt && pip install -e ."
-        ) from exc
+            f"Missing required dependencies: {', '.join(missing)}\n"
+            "If installed from source: pip install -r requirements.txt && pip install -e .\n"
+            "If installed from Homebrew: brew reinstall joshuascottpaul/build-tfidf/build-tfidf"
+        )
 
 
 def _parse_file_types(raw: str) -> set[str]:
@@ -250,6 +251,42 @@ def _run_watch(root: Path, cfg, remove_code: bool, file_types: set[str], debounc
     observer.join()
 
 
+def _friendly_error(exc: Exception) -> str:
+    """Convert common exceptions to helpful error messages."""
+    msg = str(exc)
+    if isinstance(exc, ImportError):
+        name = getattr(exc, "name", "") or ""
+        hints = {
+            "fastembed": "pip install 'build-tfidf[fastembed]'",
+            "flashrank": "pip install 'build-tfidf[flashrank]'",
+            "watchdog": "pip install 'build-tfidf[watchdog]'",
+            "unstructured": "pip install 'build-tfidf[unstructured]'",
+            "flask": "pip install 'build-tfidf[web]'",
+        }
+        for pkg, hint in hints.items():
+            if pkg in name or pkg in msg:
+                return f"{pkg} is not installed. Run: {hint}"
+        return f"Missing dependency: {msg}"
+    if isinstance(exc, FileNotFoundError):
+        if ".tfidf-index" in msg:
+            return "No index found. Run: tfidf-search build --root <DIR>"
+        return f"File not found: {msg}"
+    if isinstance(exc, ValueError) and "signature mismatch" in msg.lower():
+        return "Index was built with different settings. Run: tfidf-search build --root <DIR>"
+    if "api_key" in msg.lower() or "authentication" in msg.lower() or "OPENAI_API_KEY" in msg:
+        return (
+            "OpenAI API key not set or invalid.\n"
+            "Run: export OPENAI_API_KEY=sk-...\n"
+            "Or use a local provider: --embedding-provider fastembed"
+        )
+    if "connection" in msg.lower() and "11434" in msg:
+        return (
+            "Cannot connect to Ollama at localhost:11434.\n"
+            "Start Ollama first, or switch providers: --embedding-provider openai"
+        )
+    return msg
+
+
 def main(argv: list[str] | None = None) -> int:
     _check_runtime()
     parser = build_parser()
@@ -264,6 +301,18 @@ def main(argv: list[str] | None = None) -> int:
     ft_threads = getattr(args, "fastembed_threads", None)
     cfg = load_config_from_env(provider_override=provider, fastembed_threads=ft_threads)
 
+    try:
+        return _dispatch(args, cfg)
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        return 130
+    except Exception as exc:
+        print(f"Error: {_friendly_error(exc)}", file=sys.stderr)
+        return 1
+
+
+def _dispatch(args, cfg) -> int:
     if args.cmd == "build":
         build_index(
             Path(args.root), cfg,

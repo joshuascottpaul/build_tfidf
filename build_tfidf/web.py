@@ -354,7 +354,7 @@ def create_app(root: Path, embed_config):
 
     def _parse_build_opts(body):
         file_types_raw = body.get("file_types", "md")
-        file_types = {ft.strip() for ft in file_types_raw.split(",") if ft.strip()}
+        file_types = {ft.strip().lower().lstrip(".") for ft in file_types_raw.split(",") if ft.strip()}
         return {
             "remove_code": body.get("remove_code", False),
             "file_types": file_types or None,
@@ -404,16 +404,20 @@ def create_app(root: Path, embed_config):
             return jsonify(error="filename is required"), 400
         # Resolve against root, block path traversal
         target = (root / filename).resolve()
-        if not str(target).startswith(str(root.resolve())):
+        try:
+            target.relative_to(root.resolve())
+        except ValueError:
             return jsonify(error="Invalid filename"), 400
         if not target.exists():
             return jsonify(error="File not found"), 404
         target.unlink()
-        # Rebuild index without the deleted file
+        # Rebuild index using settings from existing metadata
         if _has_index():
-            opts = _parse_build_opts({})
+            meta = _load_json(_meta_path(root))
+            ft_str = meta.get("file_types", "md")
+            file_types = {ft.strip() for ft in ft_str.split(",") if ft.strip()}
             try:
-                _update(root, embed_config, **opts)
+                _update(root, embed_config, file_types=file_types or None)
             except Exception as exc:
                 return jsonify(error=str(exc)), 500
         return jsonify(ok=True)
