@@ -51,6 +51,19 @@ summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: #374151; 
 .result-score { font-size: 0.8rem; color: #9ca3af; }
 .result-text { font-size: 0.9rem; color: #444; margin-top: 6px; white-space: pre-wrap; }
 #status { color: #6b7280; font-size: 0.9rem; margin-bottom: 12px; }
+
+/* help */
+#helpBtn { background: none; border: 1px solid #d1d5db; border-radius: 50%; width: 24px; height: 24px; font-size: 0.85rem; color: #6b7280; cursor: pointer; line-height: 22px; text-align: center; padding: 0; }
+#helpBtn:hover { background: #f3f4f6; color: #374151; }
+#helpOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; }
+#helpBox { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: #fff; border-radius: 8px; padding: 24px; max-width: 560px; width: 90%; max-height: 80vh; overflow-y: auto; z-index: 101; font-size: 0.85rem; line-height: 1.6; color: #374151; }
+#helpBox h2 { font-size: 1rem; margin-bottom: 12px; }
+#helpBox h3 { font-size: 0.9rem; margin: 12px 0 4px; color: #111; }
+#helpBox p, #helpBox li { margin-bottom: 4px; }
+#helpBox ul { padding-left: 18px; }
+#helpBox code { background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 0.82rem; }
+#helpBox .close { position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #9ca3af; }
+#helpBox .close:hover { color: #374151; }
 </style>
 </head>
 <body>
@@ -60,8 +73,54 @@ summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: #374151; 
 <div id="toolbar">
   <span class="root" id="rootPath"></span>
   <span id="indexBadge" class="badge badge-none">no index</span>
+  <button id="helpBtn" onclick="$('helpOverlay').style.display='block'" title="Help">?</button>
 </div>
 <div id="stats"></div>
+
+<!-- help modal -->
+<div id="helpOverlay" onclick="this.style.display='none'">
+  <div id="helpBox" onclick="event.stopPropagation()">
+    <button class="close" onclick="$('helpOverlay').style.display='none'">x</button>
+    <h2>tfidf-search web UI</h2>
+    <p>Hybrid semantic + lexical search for local text corpora.</p>
+
+    <h3>Getting started</h3>
+    <ul>
+      <li>Place text files (.md, .txt) in the corpus folder shown above.</li>
+      <li>Open <b>Build / Update Index</b> and click <b>Build / Update</b>.</li>
+      <li>Type a query in the search box.</li>
+    </ul>
+
+    <h3>Build options</h3>
+    <ul>
+      <li><b>File types</b> -- comma-separated extensions to scan (e.g. <code>md,txt</code>).</li>
+      <li><b>Chunking</b> -- <code>token</code> splits at fixed windows; <code>semantic</code> splits at topic boundaries.</li>
+      <li><b>Strip code fences</b> -- remove fenced code blocks before indexing.</li>
+      <li><b>Build / Update</b> -- incremental, only re-embeds changed files.</li>
+      <li><b>Reindex</b> -- full rebuild using the settings saved in the existing index.</li>
+      <li><b>Delete &amp; Rebuild</b> -- wipe the index and build fresh with the settings above.</li>
+    </ul>
+
+    <h3>Search options</h3>
+    <ul>
+      <li><b>Results</b> -- number of results to return.</li>
+      <li><b>Fusion</b> -- <code>minmax</code> normalizes scores; <code>rrf</code> uses rank-based fusion.</li>
+      <li><b>Semantic / Lexical weight</b> -- override the default fusion weights (leave blank for auto).</li>
+      <li><b>HyDE</b> -- generates a hypothetical answer via LLM to improve recall on short queries.</li>
+      <li><b>Show all chunks</b> -- display multiple matching chunks per file instead of one per file.</li>
+    </ul>
+
+    <h3>API</h3>
+    <ul>
+      <li><code>GET /api/status</code> -- index status and stats</li>
+      <li><code>POST /api/build</code> -- incremental update</li>
+      <li><code>POST /api/rebuild</code> -- delete and rebuild</li>
+      <li><code>GET /api/search?q=...</code> -- search</li>
+      <li><code>POST /api/delete</code> -- remove a file and update index</li>
+    </ul>
+    <p>See <a href="https://github.com/joshuascottpaul/build_tfidf/blob/main/API.md">API.md</a> for full details.</p>
+  </div>
+</div>
 
 <!-- build options -->
 <details id="buildPanel">
