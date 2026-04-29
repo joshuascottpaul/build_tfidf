@@ -56,7 +56,7 @@ The `serve` subcommand starts a Flask server exposing:
 - `GET /api/status` -- index status and stats (reads metadata.json + manifest.json)
 - `POST /api/build` -- incremental update (accepts file_types, chunking, remove_code)
 - `POST /api/rebuild` -- delete index and build fresh
-- `POST /api/search` -- search with configurable top_k, fusion, weights, hyde, all_chunks
+- `GET /api/search` -- search with configurable top_k, fusion, weights, hyde, all_chunks
 - `POST /api/delete` -- remove a file from corpus and update index (path traversal protected)
 
 Search results include `filename` (bare name) alongside `path` for mapping back to external record IDs (e.g. FileMaker integration).

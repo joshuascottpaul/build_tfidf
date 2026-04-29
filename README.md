@@ -25,12 +25,10 @@ cd build_tfidf
 pip install -r requirements.txt  # if requirements.txt exists
 ```
 
-### From Release
+### From Homebrew
 
 ```bash
-curl -L https://github.com/joshuascottpaul/build_tfidf/releases/latest/download/build_tfidf-v0.1.0-darwin-arm64.tar.gz | tar xz
-cd build_tfidf-darwin-arm64
-./install.sh
+brew install joshuascottpaul/build-tfidf/build-tfidf
 ```
 
 ## Quickstart
@@ -38,7 +36,7 @@ cd build_tfidf-darwin-arm64
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e .
+pip install -e ".[web]"
 
 # Build index
 tfidf-search build
@@ -47,6 +45,9 @@ tfidf-search build
 tfidf-search "your query"
 tfidf-search search "your query"
 tfidf-search --search "your query"
+
+# Start web UI
+tfidf-search serve
 ```
 
 ## CLI
@@ -244,4 +245,5 @@ Optional extras are unpinned — install them outside Homebrew.
 ## Homebrew Install Strategy
 - Homebrew installs binary wheels at install time using `pip --only-binary :all:`.
 - `tiktoken` wheel relocation is skipped to avoid install errors.
-- Optional extras (`fastembed`, `flashrank`, etc.) are not part of the Homebrew formula — install them manually after `brew install`.
+- Optional extras (`fastembed`, `flashrank`, `flask`, etc.) are not part of the Homebrew formula -- install them manually after `brew install`.
+- To use `tfidf-search serve` from a Homebrew install: `/opt/homebrew/opt/build-tfidf/libexec/bin/pip install flask`
