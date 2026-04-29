@@ -4,11 +4,21 @@ Get semantic search running on a local folder in under 5 minutes.
 
 ## 1. Install
 
+**From source (recommended for web UI):**
 ```bash
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e ".[web]"
+```
+
+**From Homebrew:**
+```bash
+brew install joshuascottpaul/build-tfidf/build-tfidf
+```
+The Homebrew formula installs core dependencies only. To use the web UI (`serve` command), install flask into the brew venv:
+```bash
+/opt/homebrew/opt/build-tfidf/libexec/bin/pip install flask
 ```
 
 ## 2. Set up embeddings
