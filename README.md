@@ -54,30 +54,41 @@ tfidf-search --query "your query"
 ### build
 ```
 tfidf-search build [--root DIR] [--remove-code] [--file-types md,txt,html,docx]
+                   [--embedding-provider {openai,fastembed,ollama}]
+                   [--chunking {token,semantic}]
 ```
 Builds the index from scratch. Defaults to `--root .` and `--file-types md`.
+
+- `--chunking semantic` -- split text at topic boundaries using embedding similarity instead of fixed token windows
 
 ### update
 ```
 tfidf-search update [--root DIR] [--remove-code] [--file-types md,html,docx]
+                    [--chunking {token,semantic}]
 ```
 Incrementally re-indexes only changed or new files.
 
-### query
+### search
 ```
-tfidf-search query TEXT [--top N] [--rerank-model MODEL] [--rerank-top N]
-                        [--all-chunks] [--open N] [--reveal N] [--pbcopy N]
-                        [--paths-only]
-tfidf-search TEXT       # shorthand
-tfidf-search --query TEXT
+tfidf-search search TEXT [--top N] [--rerank-model MODEL] [--rerank-top N]
+                         [--fusion {minmax,rrf}] [--hyde]
+                         [--weight-semantic F] [--weight-lexical F]
+                         [--all-chunks] [--open N] [--reveal N] [--pbcopy N]
+                         [--paths-only]
+tfidf-search TEXT        # shorthand
+tfidf-search --search TEXT
 ```
-- `--top N` — number of results (default 10)
-- `--rerank-model MODEL` — flashrank model name to re-rank results (e.g. `ms-marco-MiniLM-L-12-v2`)
-- `--all-chunks` — show multiple chunks per file instead of deduping by path
-- `--open N` — open result N in default app
-- `--reveal N` — reveal result N in Finder
-- `--pbcopy N` — copy result N path to clipboard
-- `--paths-only` — print file paths only (useful for scripts)
+- `--top N` -- number of results (default 10)
+- `--fusion {minmax,rrf}` -- score fusion method (default: minmax). `rrf` uses Reciprocal Rank Fusion, which is rank-based and ignores raw score magnitudes.
+- `--hyde` -- use HyDE (Hypothetical Document Embeddings) for query expansion. Generates a hypothetical answer via LLM and embeds that for semantic search. Requires OpenAI or Ollama.
+- `--weight-semantic F` -- override semantic fusion weight (default: per-provider)
+- `--weight-lexical F` -- override lexical fusion weight (default: per-provider)
+- `--rerank-model MODEL` -- flashrank model name to re-rank results (e.g. `ms-marco-MiniLM-L-12-v2`)
+- `--all-chunks` -- show multiple chunks per file instead of deduping by path
+- `--open N` -- open result N in default app
+- `--reveal N` -- reveal result N in Finder
+- `--pbcopy N` -- copy result N path to clipboard
+- `--paths-only` -- print file paths only (useful for scripts)
 
 ### watch
 ```
@@ -133,6 +144,39 @@ tfidf-search query "your query" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-
 ```
 
 Available models: `ms-marco-MiniLM-L-12-v2` (default), `ms-marco-MultiBERT-L-12`, `rank-T5-flan`.
+
+## Score Fusion
+
+Two fusion methods are available for combining semantic and lexical search results:
+
+- **minmax** (default) -- min-max normalizes scores from each index, then combines with weighted sum. Default weights are per-provider: OpenAI 0.7/0.3, fastembed and Ollama 0.6/0.4.
+- **rrf** -- Reciprocal Rank Fusion. Rank-based, ignores raw score magnitudes. More robust when score distributions differ between semantic and lexical results.
+
+```bash
+tfidf-search search "your query" --fusion rrf
+tfidf-search search "your query" --weight-semantic 0.8 --weight-lexical 0.2
+```
+
+## HyDE (Hypothetical Document Embeddings)
+
+HyDE improves recall for short or vague queries by generating a hypothetical answer via an LLM, then embedding that answer for semantic search. BM25 lexical search still uses the original query.
+
+```bash
+tfidf-search search "your query" --hyde
+```
+
+Requires OpenAI or Ollama (fastembed has no LLM, falls back to raw query). Configure the generation model with `HYDE_MODEL` env var (defaults to `gpt-4o-mini` for OpenAI, `llama3.2` for Ollama).
+
+## Semantic Chunking
+
+By default, text is split into fixed-size token windows. Semantic chunking detects topic boundaries by measuring embedding similarity between adjacent paragraphs and splits there instead.
+
+```bash
+tfidf-search build --chunking semantic
+tfidf-search update --chunking semantic
+```
+
+This adds embedding calls at build time (one per paragraph). Falls back to token chunking for files with fewer than 3 paragraphs.
 
 ## Indexing non-Markdown files
 

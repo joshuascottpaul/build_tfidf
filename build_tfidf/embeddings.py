@@ -8,6 +8,13 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 
+_PROVIDER_WEIGHTS: dict[str, tuple[float, float]] = {
+    "openai": (0.7, 0.3),
+    "fastembed": (0.6, 0.4),
+    "ollama": (0.6, 0.4),
+}
+
+
 @dataclass(frozen=True)
 class EmbeddingConfig:
     provider: str
@@ -19,6 +26,10 @@ class EmbeddingConfig:
     ollama_model: str
     fastembed_model: str = "BAAI/bge-small-en-v1.5"
     fastembed_threads: int | None = None
+
+    def default_weights(self) -> tuple[float, float]:
+        """Returns (weight_semantic, weight_lexical) tuned for this provider."""
+        return _PROVIDER_WEIGHTS.get(self.provider.lower(), (0.7, 0.3))
 
 
 def _rate_limit_sleep(last_call: float, rpm_limit: int) -> float:
@@ -61,21 +72,48 @@ def embed_openai(texts: Iterable[str], config: EmbeddingConfig) -> list[list[flo
     return out
 
 
-def embed_ollama(texts: Iterable[str], config: EmbeddingConfig) -> list[list[float]]:
+def _ollama_batch(texts: list[str], model: str) -> list[list[float]]:
+    """Batch embed via /api/embed (Ollama 0.4.0+)."""
     import json
     import urllib.request
 
+    payload = json.dumps({"model": model, "input": texts}).encode("utf-8")
+    req = urllib.request.Request(
+        "http://localhost:11434/api/embed",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        return data["embeddings"]
+
+
+def _ollama_single(text: str, model: str) -> list[float]:
+    """Single-text embed via /api/embeddings (legacy Ollama)."""
+    import json
+    import urllib.request
+
+    payload = json.dumps({"model": model, "prompt": text}).encode("utf-8")
+    req = urllib.request.Request(
+        "http://localhost:11434/api/embeddings",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        return data["embedding"]
+
+
+def embed_ollama(texts: Iterable[str], config: EmbeddingConfig) -> list[list[float]]:
+    all_texts = list(texts)
     out: list[list[float]] = []
-    for text in texts:
-        payload = json.dumps({"model": config.ollama_model, "prompt": text}).encode("utf-8")
-        req = urllib.request.Request(
-            "http://localhost:11434/api/embeddings",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            out.append(data["embedding"])
+    for i in range(0, len(all_texts), config.batch_size):
+        batch = all_texts[i : i + config.batch_size]
+        try:
+            out.extend(_ollama_batch(batch, config.ollama_model))
+        except Exception:
+            for text in batch:
+                out.append(_ollama_single(text, config.ollama_model))
     return out
 
 

@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-from .chunking import Chunk, chunk_text
+from .chunking import Chunk, chunk_text, chunk_text_semantic
 from .cleaning import clean_text
 from .embeddings import EmbeddingConfig, embed_texts
+from .hyde import generate_hypothetical
 from .ingest import DEFAULT_EXCLUDE_DIRS, iter_files, iter_markdown_files, read_text_strict, sha256_text
 from .manifest import ManifestEntry, build_manifest, load_manifest
 from .lexical import LexicalIndex, build_index as build_lexical, search as search_lexical
@@ -67,6 +68,8 @@ def _build_chunks(
     remove_code: bool,
     chunk_size: int,
     chunk_overlap: int,
+    chunking_strategy: str = "token",
+    embed_config: EmbeddingConfig | None = None,
 ) -> tuple[list[Chunk], dict[str, str]]:
     """Returns (chunks, path->text mapping) to avoid re-reading files."""
     all_chunks: list[Chunk] = []
@@ -77,7 +80,11 @@ def _build_chunks(
             continue
         texts[str(path)] = text
         cleaned = clean_text(text, remove_code=remove_code)
-        all_chunks.extend(chunk_text(path, cleaned, max_tokens=chunk_size, overlap=chunk_overlap))
+        if chunking_strategy == "semantic" and embed_config is not None:
+            embed_fn = lambda t: embed_texts(t, embed_config)
+            all_chunks.extend(chunk_text_semantic(path, cleaned, embed_fn=embed_fn, max_tokens=chunk_size))
+        else:
+            all_chunks.extend(chunk_text(path, cleaned, max_tokens=chunk_size, overlap=chunk_overlap))
     return all_chunks, texts
 
 
@@ -86,14 +93,21 @@ def build(
     embed_config: EmbeddingConfig,
     chunk_size: int = 800,
     chunk_overlap: int = 100,
-    weight_semantic: float = 0.7,
-    weight_lexical: float = 0.3,
+    weight_semantic: float | None = None,
+    weight_lexical: float | None = None,
     remove_code: bool = False,
     file_types: set[str] | None = None,
+    chunking_strategy: str = "token",
 ) -> None:
     _ensure_data_dir(root)
+    default_sem, default_lex = embed_config.default_weights()
+    weight_semantic = weight_semantic if weight_semantic is not None else default_sem
+    weight_lexical = weight_lexical if weight_lexical is not None else default_lex
     paths = iter_files(root, file_types=file_types, exclude_dirs=DEFAULT_EXCLUDE_DIRS)
-    all_chunks, path_texts = _build_chunks(paths, remove_code, chunk_size, chunk_overlap)
+    all_chunks, path_texts = _build_chunks(
+        paths, remove_code, chunk_size, chunk_overlap,
+        chunking_strategy=chunking_strategy, embed_config=embed_config,
+    )
 
     if not all_chunks:
         raise SystemExit("No chunks to index.")
@@ -119,6 +133,7 @@ def build(
         vector_backend="faiss",
         weight_semantic=weight_semantic,
         weight_lexical=weight_lexical,
+        chunking_strategy=chunking_strategy,
     )
     _save_json(_meta_path(root), meta.to_dict())
 
@@ -171,17 +186,25 @@ def query(
     embed_config: EmbeddingConfig,
     root: Path = Path("."),
     top_k: int = 10,
-    weight_semantic: float = 0.7,
-    weight_lexical: float = 0.3,
+    weight_semantic: float | None = None,
+    weight_lexical: float | None = None,
+    fusion_method: str = "minmax",
     rerank_model: str | None = None,
     rerank_top_n: int = 30,
     dedupe_by_path: bool = True,
+    hyde: bool = False,
 ) -> list[tuple[dict, float]]:
     meta = _load_json(_meta_path(root))
     validate_signature(meta)
+    default_sem, default_lex = embed_config.default_weights()
+    weight_semantic = weight_semantic if weight_semantic is not None else default_sem
+    weight_lexical = weight_lexical if weight_lexical is not None else default_lex
 
     vindex = load_vector(_vec_path(root))
-    query_vec = embed_texts([query_text], embed_config)[0]
+    embed_query = query_text
+    if hyde:
+        embed_query = generate_hypothetical(query_text, embed_config.provider)
+    query_vec = embed_texts([embed_query], embed_config)[0]
     fetch_k = rerank_top_n if rerank_model else top_k
     sem_hits = search(vindex, query_vec, top_k=fetch_k * 5)
     sem_scores = {idx: score for idx, score in sem_hits if idx >= 0}
@@ -190,7 +213,7 @@ def query(
     lex_hits = search_lexical(lex_index, query_text, top_k=fetch_k * 5)
     lex_scores = {idx: score for idx, score in lex_hits}
 
-    fused = fuse_scores(sem_scores, lex_scores, weight_semantic, weight_lexical)
+    fused = fuse_scores(sem_scores, lex_scores, weight_semantic, weight_lexical, method=fusion_method)
     manifest = _load_json(_manifest_path(root))
 
     results = []
@@ -234,15 +257,16 @@ def update(
     embed_config: EmbeddingConfig,
     chunk_size: int = 800,
     chunk_overlap: int = 100,
-    weight_semantic: float = 0.7,
-    weight_lexical: float = 0.3,
+    weight_semantic: float | None = None,
+    weight_lexical: float | None = None,
     remove_code: bool = False,
     file_types: set[str] | None = None,
+    chunking_strategy: str = "token",
 ) -> None:
     _ensure_data_dir(root)
 
     if not _meta_path(root).exists():
-        build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code, file_types)
+        build(root, embed_config, chunk_size, chunk_overlap, weight_semantic, weight_lexical, remove_code, file_types, chunking_strategy=chunking_strategy)
         return
 
     meta = _load_json(_meta_path(root))
@@ -296,7 +320,11 @@ def update(
         if text is None:
             continue
         cleaned = clean_text(text, remove_code=remove_code)
-        new_chunks.extend(chunk_text(path, cleaned, max_tokens=chunk_size, overlap=chunk_overlap))
+        if chunking_strategy == "semantic":
+            embed_fn = lambda t: embed_texts(t, embed_config)
+            new_chunks.extend(chunk_text_semantic(path, cleaned, embed_fn=embed_fn, max_tokens=chunk_size))
+        else:
+            new_chunks.extend(chunk_text(path, cleaned, max_tokens=chunk_size, overlap=chunk_overlap))
 
     if new_chunks:
         new_vectors = embed_texts([c.text for c in new_chunks], embed_config)

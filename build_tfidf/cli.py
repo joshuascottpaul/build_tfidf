@@ -54,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
             "  # Build using Ollama embeddings\n"
             "  tfidf-search build --embedding-provider ollama\n"
             "\n"
+            "  # Build with semantic chunking (splits at topic boundaries)\n"
+            "  tfidf-search build --chunking semantic\n"
+            "\n"
             "  # Search — three equivalent shorthands\n"
             "  tfidf-search \"retrieval augmented generation\"\n"
             "  tfidf-search search \"retrieval augmented generation\"\n"
@@ -70,6 +73,15 @@ def build_parser() -> argparse.ArgumentParser:
             "\n"
             "  # Search and re-rank with a larger candidate pool\n"
             "  tfidf-search search \"chunking strategies\" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 50\n"
+            "\n"
+            "  # Use Reciprocal Rank Fusion instead of min-max normalization\n"
+            "  tfidf-search search \"chunking strategies\" --fusion rrf\n"
+            "\n"
+            "  # Override fusion weights (default: per-provider)\n"
+            "  tfidf-search search \"chunking strategies\" --weight-semantic 0.8 --weight-lexical 0.2\n"
+            "\n"
+            "  # Use HyDE (hypothetical document embeddings) for better recall\n"
+            "  tfidf-search search \"chunking strategies\" --hyde\n"
             "\n"
             "  # Show all matching chunks, not just one per file\n"
             "  tfidf-search search \"embedding models\" --all-chunks\n"
@@ -114,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     b.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
     b.add_argument("--fastembed-threads", type=int, default=None, help="limit fastembed CPU threads (e.g. 2 for cron jobs)")
+    b.add_argument("--chunking", choices=["token", "semantic"], default="token", help="chunking strategy (default: token)")
 
     u = sub.add_parser("update", help="incrementally update the index")
     u.add_argument("--root", default=".", help="root directory to scan")
@@ -121,6 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("--file-types", default="md", help="comma-separated file types (md,txt,html,docx)")
     u.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
     u.add_argument("--fastembed-threads", type=int, default=None, help="limit fastembed CPU threads (e.g. 2 for cron jobs)")
+    u.add_argument("--chunking", choices=["token", "semantic"], default="token", help="chunking strategy (default: token)")
 
     q = sub.add_parser("search", help="search the index")
     q.add_argument("text", help="query text")
@@ -133,6 +147,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--reveal", dest="reveal_index", type=int, help="reveal result in Finder")
     q.add_argument("--pbcopy", dest="pbcopy_index", type=int, help="copy result path to clipboard")
     q.add_argument("--paths-only", action="store_true", help="print only file paths")
+    q.add_argument("--hyde", action="store_true", help="use HyDE (hypothetical document embeddings) for query expansion")
+    q.add_argument("--fusion", choices=["minmax", "rrf"], default="minmax", help="score fusion method (default: minmax)")
+    q.add_argument("--weight-semantic", type=float, default=None, help="semantic weight override (default: per-provider)")
+    q.add_argument("--weight-lexical", type=float, default=None, help="lexical weight override (default: per-provider)")
     q.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
 
     w = sub.add_parser("watch", help="watch corpus and auto-update index on changes")
@@ -244,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.root), cfg,
             remove_code=args.remove_code,
             file_types=_parse_file_types(args.file_types),
+            chunking_strategy=args.chunking,
         )
         return 0
 
@@ -252,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.root), cfg,
             remove_code=args.remove_code,
             file_types=_parse_file_types(args.file_types),
+            chunking_strategy=args.chunking,
         )
         return 0
 
@@ -272,9 +292,13 @@ def main(argv: list[str] | None = None) -> int:
             cfg,
             root=Path(args.root),
             top_k=args.top,
+            weight_semantic=args.weight_semantic,
+            weight_lexical=args.weight_lexical,
+            fusion_method=args.fusion,
             rerank_model=rerank_model,
             rerank_top_n=args.rerank_top,
             dedupe_by_path=not args.all_chunks,
+            hyde=args.hyde,
         )
         for idx, (chunk, score) in enumerate(results, start=1):
             if args.paths_only:
