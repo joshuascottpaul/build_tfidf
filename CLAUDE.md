@@ -45,6 +45,7 @@ Key modules in `build_tfidf/`:
 - `scoring.py` -- Min-max normalization + weighted fusion (default 0.7 semantic / 0.3 lexical)
 - `manifest.py` -- Tracks file metadata for incremental updates
 - `metadata.py` -- Index signature computation and validation
+- `web.py` -- Optional Flask web UI (`serve` subcommand). Lazy-imports flask so the module is safe to skip when flask is not installed.
 
 Index files are stored in `<corpus_root>/.tfidf-index/` (index.faiss, vectors.npy, metadata.json, manifest.json, lexical.json).
 
@@ -53,10 +54,10 @@ Index files are stored in `<corpus_root>/.tfidf-index/` (index.faiss, vectors.np
 Versions are pinned in `requirements.txt` for Homebrew compatibility. Key constraints:
 - `faiss-cpu==1.10.0` -- needs PyPI wheels; newer versions lack sdist
 - `openai==1.61.0` -- 2.x pulls `jiter` which needs Rust to build from sdist
-- Optional extras (`fastembed`, `flashrank`, `watchdog`, `unstructured`) are unpinned
+- Optional extras (`fastembed`, `flashrank`, `watchdog`, `unstructured`, `web`) are unpinned
 
 Version is declared in both `pyproject.toml` and `build_tfidf/__init__.py` -- keep them in sync.
 
 ## Style and Communication
 
-Per CONTRIBUTING.md: no em dash, no emoji, brief/factual/calm responses. CLI only -- no web UI or services.
+Per CONTRIBUTING.md: no em dash, no emoji, brief/factual/calm responses. CLI-first; optional web UI via `tfidf-search serve`.

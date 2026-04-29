@@ -106,7 +106,7 @@ Update to match install paths and runtime requirements.
 ```
 
 ## Scope guardrails
-- CLI only. No web UI or services.
+- CLI-first. Optional web UI via `tfidf-search serve` (requires flask extra).
 - Keep install paths and runtime guidance accurate for macOS and Homebrew.
 - Use Lets in prompts for consistency.
 

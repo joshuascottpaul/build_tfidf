@@ -115,6 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  pip install 'build-tfidf[flashrank]'    local cross-encoder re-ranking\n"
             "  pip install 'build-tfidf[watchdog]'     watch command\n"
             "  pip install 'build-tfidf[unstructured]' html/docx indexing\n"
+            "  pip install 'build-tfidf[web]'          web UI (serve command)\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -165,6 +166,12 @@ def build_parser() -> argparse.ArgumentParser:
     insp.add_argument("chunk_id", help="chunk id")
     insp.add_argument("--root", default=".", help="root directory where index lives")
 
+    srv = sub.add_parser("serve", help="start web UI (requires flask)")
+    srv.add_argument("--root", default=".", help="root directory where index lives")
+    srv.add_argument("--host", default="127.0.0.1", help="bind address")
+    srv.add_argument("--port", type=int, default=8080, help="port number")
+    srv.add_argument("--embedding-provider", choices=["openai", "fastembed", "ollama"], default=None, help="embedding provider (overrides EMBEDDING_PROVIDER env var)")
+
     return parser
 
 
@@ -185,7 +192,7 @@ def _inject_shorthand_search(argv: list[str] | None) -> list[str]:
         return ["search", value, *rest]
     if argv[0].startswith("-"):
         return argv
-    if argv[0] in {"build", "update", "search", "inspect", "watch"}:
+    if argv[0] in {"build", "update", "search", "inspect", "watch", "serve"}:
         return argv
     if any(token.startswith("-") for token in argv[1:]):
         return ["search", *argv]
@@ -328,6 +335,14 @@ def main(argv: list[str] | None = None) -> int:
                 if not path:
                     raise SystemExit("Invalid --pbcopy index.")
                 subprocess.run(["pbcopy"], input=path, text=True, check=False)
+        return 0
+
+    if args.cmd == "serve":
+        try:
+            from .web import start_server
+        except ImportError as exc:
+            raise SystemExit("flask is not installed. Run: pip install 'build-tfidf[web]'") from exc
+        start_server(Path(args.root), args.host, args.port, cfg)
         return 0
 
     if args.cmd == "inspect":

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "build-tfidf"
-version = "0.1.11"
+version = "0.1.12"
 description = "High-quality semantic search for Markdown corpora."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -50,6 +50,7 @@ fastembed = ["fastembed>=0.3"]
 flashrank = ["flashrank>=0.2"]
 watchdog = ["watchdog>=4.0"]
 unstructured = ["unstructured[docx,html]>=0.13"]
+web = ["flask>=3.0"]
 
 [project.scripts]
 tfidf-search = "build_tfidf.cli:main"

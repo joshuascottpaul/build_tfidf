@@ -132,6 +132,7 @@ def build(
         weight_semantic=weight_semantic,
         weight_lexical=weight_lexical,
         chunking_strategy=chunking_strategy,
+        file_types=",".join(sorted(file_types)) if file_types else "md",
     )
     _save_json(_meta_path(root), meta.to_dict())
 

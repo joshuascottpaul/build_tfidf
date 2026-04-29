@@ -41,6 +41,15 @@ tfidf-search search "your query" --paths-only
 tfidf-search search "your query" --all-chunks
 ```
 
+## Serve (web UI)
+```bash
+pip install "build-tfidf[web]"
+tfidf-search serve
+tfidf-search serve --root /path/to/corpus
+tfidf-search serve --port 9090
+tfidf-search serve --host 0.0.0.0 --port 8080
+```
+
 ## Inspect
 ```bash
 tfidf-search inspect <chunk_id>

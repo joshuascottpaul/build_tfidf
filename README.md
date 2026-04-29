@@ -100,6 +100,25 @@ Rapid saves are debounced (default 1.5s) into a single update. Requires `watchdo
 pip install "build-tfidf[watchdog]"
 ```
 
+### serve (web UI)
+```
+tfidf-search serve [--root DIR] [--host HOST] [--port PORT]
+                   [--embedding-provider {openai,fastembed,ollama}]
+```
+Starts a local web UI for building and searching an index. Defaults to `127.0.0.1:8080`.
+
+Features:
+- Index stats display (model, dimensions, chunk/file counts, weights, build date)
+- Build/update with configurable file types, chunking strategy, and code fence stripping
+- Reindex using saved settings from the existing index
+- Delete and rebuild with new settings
+- Search with adjustable top-k, fusion method, weight overrides, HyDE, and all-chunks toggle
+
+Requires `flask`:
+```bash
+pip install "build-tfidf[web]"
+```
+
 ### inspect
 ```
 tfidf-search inspect CHUNK_ID
@@ -196,10 +215,11 @@ tfidf-search watch --file-types md,html,docx
 | `flashrank` | `flashrank` | Local cross-encoder re-ranking |
 | `watchdog` | `watchdog` | `tfidf-search watch` command |
 | `unstructured` | `unstructured[docx,html]` | Index `.html` and `.docx` files |
+| `web` | `flask` | `tfidf-search serve` web UI |
 
 Install multiple at once:
 ```bash
-pip install "build-tfidf[fastembed,flashrank,watchdog]"
+pip install "build-tfidf[fastembed,flashrank,watchdog,web]"
 ```
 
 ## Dependency Pins and Rationale

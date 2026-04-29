@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.12
+- Add `serve` subcommand with a local web UI for building and searching indexes.
+- Web UI displays index statistics (model, dimensions, chunk/file counts, weights, build date).
+- Build panel with configurable file types, chunking strategy, and code fence stripping.
+- Reindex button rebuilds using saved settings from the existing index metadata.
+- Delete and rebuild option for changing settings from scratch.
+- Search panel with adjustable top-k, fusion method, weight overrides, HyDE, and all-chunks toggle.
+- Store `file_types` in index metadata for settings recall.
+- New optional extra: `pip install "build-tfidf[web]"` (requires flask).
+
 ## 0.1.0
 - Initial scaffolding.
 ## 0.1.5

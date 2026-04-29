@@ -20,6 +20,7 @@ class IndexMetadata:
     weight_semantic: float
     weight_lexical: float
     chunking_strategy: str = "token"
+    file_types: str = "md"
 
     def signature(self) -> str:
         raw = (
@@ -65,6 +66,7 @@ def validate_signature(meta: dict[str, Any]) -> None:
         weight_semantic=float(meta["weight_semantic"]),
         weight_lexical=float(meta["weight_lexical"]),
         chunking_strategy=str(meta.get("chunking_strategy", "token")),
+        file_types=str(meta.get("file_types", "md")),
     )
     if derived.signature() != meta["index_signature"]:
         raise ValueError("Index signature mismatch. Rebuild required.")
