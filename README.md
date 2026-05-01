@@ -5,24 +5,13 @@ High-quality hybrid semantic + lexical search for local Markdown corpora.
 
 ## Installation
 
-### Quick Install with Package Managers
-
-**Using [ubi](https://github.com/houseabsolute/ubi):**
-```bash
-ubi --project joshuascottpaul/build_tfidf --in ~/.local/bin
-```
-
-**Using [bin](https://github.com/marcosnils/bin):**
-```bash
-bin install github.com/joshuascottpaul/build_tfidf
-```
-
-### Manual Install
+### From source
 
 ```bash
 git clone https://github.com/joshuascottpaul/build_tfidf.git
 cd build_tfidf
-pip install -r requirements.txt  # if requirements.txt exists
+pip install -r requirements.txt
+pip install -e .
 ```
 
 ### From Homebrew
@@ -57,15 +46,18 @@ tfidf-search serve
 tfidf-search build [--root DIR] [--remove-code] [--file-types md,txt,html,docx]
                    [--embedding-provider {openai,fastembed,ollama}]
                    [--chunking {token,semantic}]
+                   [--fastembed-threads N]
 ```
 Builds the index from scratch. Defaults to `--root .` and `--file-types md`.
 
 - `--chunking semantic` -- split text at topic boundaries using embedding similarity instead of fixed token windows
+- `--fastembed-threads N` -- limit CPU threads used by fastembed (useful for cron jobs running alongside other workloads)
 
 ### update
 ```
-tfidf-search update [--root DIR] [--remove-code] [--file-types md,html,docx]
+tfidf-search update [--root DIR] [--remove-code] [--file-types md,txt,html,docx]
                     [--chunking {token,semantic}]
+                    [--fastembed-threads N]
 ```
 Incrementally re-indexes only changed or new files.
 
@@ -76,6 +68,7 @@ tfidf-search search TEXT [--top N] [--rerank-model MODEL] [--rerank-top N]
                          [--weight-semantic F] [--weight-lexical F]
                          [--all-chunks] [--open N] [--reveal N] [--pbcopy N]
                          [--paths-only]
+                         [--embedding-provider {openai,fastembed,ollama}]
 tfidf-search TEXT        # shorthand
 tfidf-search --search TEXT
 ```
@@ -93,7 +86,9 @@ tfidf-search --search TEXT
 
 ### watch
 ```
-tfidf-search watch [--root DIR] [--file-types md,html,docx] [--debounce SECS]
+tfidf-search watch [--root DIR] [--file-types md,txt,html,docx] [--debounce SECS]
+                   [--embedding-provider {openai,fastembed,ollama}]
+                   [--fastembed-threads N]
 ```
 Watches the corpus directory and automatically runs `update` when files change.
 Rapid saves are debounced (default 1.5s) into a single update. Requires `watchdog`:
@@ -160,7 +155,7 @@ Re-ranking uses [flashrank](https://github.com/PrithivirajDamodharan/FlashRank),
 
 ```bash
 pip install "build-tfidf[flashrank]"
-tfidf-search query "your query" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 30
+tfidf-search search "your query" --rerank-model ms-marco-MiniLM-L-12-v2 --rerank-top 30
 ```
 
 Available models: `ms-marco-MiniLM-L-12-v2` (default), `ms-marco-MultiBERT-L-12`, `rank-T5-flan`.
@@ -205,7 +200,7 @@ Plain text (`.txt`) files are supported natively. HTML and DOCX files require [u
 ```bash
 pip install "build-tfidf[unstructured]"
 tfidf-search build --file-types md,html,docx
-tfidf-search watch --file-types md,html,docx
+tfidf-search watch --file-types md,txt,html,docx
 ```
 
 ## Optional extras summary

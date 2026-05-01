@@ -1,11 +1,11 @@
-# build_tfidf Cheatsheet
+# tfidf-search Cheatsheet
 
 ## Setup
 ```bash
-python3 -m venv .venv
+python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e .
+pip install -e .              # add .[web] to include the serve command
 ```
 
 ## Build
@@ -15,6 +15,7 @@ tfidf-search build --root /path/to/corpus
 tfidf-search build --remove-code
 tfidf-search build --chunking semantic
 tfidf-search build --embedding-provider fastembed
+tfidf-search build --embedding-provider fastembed --fastembed-threads 2
 ```
 
 ## Update
@@ -22,6 +23,7 @@ tfidf-search build --embedding-provider fastembed
 tfidf-search update
 tfidf-search update --root /path/to/corpus
 tfidf-search update --chunking semantic
+tfidf-search update --embedding-provider fastembed --fastembed-threads 2
 ```
 
 ## Search
@@ -58,8 +60,10 @@ tfidf-search inspect <chunk_id>
 ## Env
 ```bash
 export OPENAI_API_KEY="..."
-export EMBEDDING_PROVIDER=openai       # openai, fastembed, ollama
-export FALLBACK_TO_OLLAMA=true
+export EMBEDDING_PROVIDER=openai          # openai, fastembed, ollama
+export OPENAI_MODEL=text-embedding-3-large
+export FASTEMBED_MODEL=BAAI/bge-small-en-v1.5
 export OLLAMA_MODEL=nomic-embed-text
-export HYDE_MODEL=gpt-4o-mini          # or llama3.2 for Ollama
+export FALLBACK_TO_OLLAMA=true
+export HYDE_MODEL=gpt-4o-mini             # or llama3.2 for Ollama
 ```

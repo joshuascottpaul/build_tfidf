@@ -10,28 +10,6 @@
 - Store `file_types` in index metadata for settings recall.
 - New optional extra: `pip install "build-tfidf[web]"` (requires flask).
 
-## 0.1.0
-- Initial scaffolding.
-## 0.1.5
-- Pin openai to 1.61.0 to avoid jiter Rust build in Homebrew.
-- Keep faiss-cpu pinned to 1.10.0 for PyPI availability.
-- Add dependency pin rationale to README.
-
-## 0.1.6
-- Add explicit transitive runtime pins for Homebrew installs.
-- Document relocation skip for tiktoken.
-
-## 0.1.7
-- Add query helpers for open, reveal, and clipboard.
-- Add paths-only output and default file dedupe.
-
-## 0.1.8
-- Add exceptiongroup to runtime deps for Homebrew on Python 3.10.
-
-## 0.1.9
-- Show help on no args.
-- Fix shorthand query parsing.
-
 ## 0.1.11
 - Add Reciprocal Rank Fusion (`--fusion rrf`) as alternative to min-max score normalization.
 - Batch Ollama embeddings via `/api/embed` endpoint with fallback to legacy API.
@@ -44,3 +22,26 @@
 ## 0.1.10
 - Preserve flags in shorthand queries like `--open` and `--pbcopy`.
 - Expand CLI help examples and query options.
+
+## 0.1.9
+- Show help on no args.
+- Fix shorthand query parsing.
+
+## 0.1.8
+- Add exceptiongroup to runtime deps for Homebrew on Python 3.10.
+
+## 0.1.7
+- Add query helpers for open, reveal, and clipboard.
+- Add paths-only output and default file dedupe.
+
+## 0.1.6
+- Add explicit transitive runtime pins for Homebrew installs.
+- Document relocation skip for tiktoken.
+
+## 0.1.5
+- Pin openai to 1.61.0 to avoid jiter Rust build in Homebrew.
+- Keep faiss-cpu pinned to 1.10.0 for PyPI availability.
+- Add dependency pin rationale to README.
+
+## 0.1.0
+- Initial scaffolding.
