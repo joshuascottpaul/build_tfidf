@@ -48,7 +48,7 @@ def iter_files(
     excludes = set(exclude_dirs or DEFAULT_EXCLUDE_DIRS)
     paths: list[Path] = []
     for ft in types:
-        for path in root.rglob(f"*.{ft}"):
+        for path in root.rglob(f"*.{ft}", recurse_symlinks=True):
             if any(part in excludes for part in path.parts):
                 continue
             paths.append(path)
